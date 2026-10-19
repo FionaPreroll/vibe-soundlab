@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vibe Soundlab</title>
+  <meta name="description" content="Learn D&B sound design hands-on: build a foghorn bass step by step.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <div>
+        <div class="brand-name">Vibe Soundlab</div>
+        <div class="brand-sub">Lesson 4 · The Foghorn</div>
+      </div>
+    </div>
+    <div class="transport">
+      <button id="play" class="btn primary" type="button" disabled>Play</button>
+      <button id="drums" class="btn toggle on" type="button" aria-pressed="true">Drums</button>
+      <button id="target" class="btn toggle target-btn" type="button" aria-pressed="false">Hear target</button>
+      <label class="vol">Vol <input id="volume" type="range" min="-40" max="0" step="0.5" value="-8"></label>
+    </div>
+    <div class="meters" aria-live="off">
+      <div class="meter"><span class="meter-label">Short-term</span><span id="lufs" class="meter-value">– LUFS</span></div>
+      <div class="meter"><span class="meter-label">Peak</span><span id="peak" class="meter-value">– dB</span></div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="lesson" aria-label="Lesson">
+      <ol id="step-list" class="step-list"></ol>
+      <article class="step-card">
+        <div class="step-kicker" id="step-kicker"></div>
+        <h1 id="step-title"></h1>
+        <h2>Why</h2>
+        <p id="step-why"></p>
+        <h2>Do</h2>
+        <ol id="step-todo"></ol>
+        <h2>Listen for</h2>
+        <p id="step-listen" class="listen"></p>
+        <div id="step-feedback" class="feedback" aria-live="polite"></div>
+        <div class="step-actions">
+          <button id="back" class="btn" type="button">Back</button>
+          <button id="show" class="btn" type="button">Show me</button>
+          <button id="next" class="btn primary" type="button">Next</button>
+        </div>
+      </article>
+    </aside>
+
+    <section class="rack" aria-label="Synth">
+      <div class="flow" id="flow" aria-hidden="true"></div>
+      <div class="modules" id="modules"></div>
+      <div class="rack-foot">
+        <button id="reset" class="btn small" type="button">Reset patch</button>
+        <span class="hint">Drag knobs up and down. Shift for fine control, double-click to reset.</span>
+      </div>
+    </section>
+
+    <section class="analysis" aria-label="Spectrum">
+      <div class="analysis-head">
+        <div class="seg" role="radiogroup" aria-label="Spectrum source">
+          <button type="button" class="on" data-src="bass" role="radio" aria-checked="true">Bass</button>
+          <button type="button" data-src="mix" role="radio" aria-checked="false">Full mix</button>
+        </div>
+        <div class="legend">
+          <span class="key live"></span>Yours
+          <span class="key target"></span>Target
+        </div>
+      </div>
+      <div class="spectrum-wrap">
+        <canvas id="spectrum"></canvas>
+        <canvas id="scope" class="scope" title="Waveform"></canvas>
+      </div>
+      <div class="bands" id="bands"></div>
+      <p class="band-note" id="band-note">Play the loop to start the band check.</p>
+    </section>
+  </main>
+
+  <div class="overlay" id="overlay">
+    <div class="overlay-card">
+      <div class="logo big" aria-hidden="true"></div>
+      <h1>Build a foghorn</h1>
+      <p>Six guided steps from a plain sine to a loud, deliberately overdriven D&amp;B foghorn bass. The loop plays at 174 BPM. Headphones or proper monitors are recommended.</p>
+      <button id="start" class="btn primary big" type="button">Start</button>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

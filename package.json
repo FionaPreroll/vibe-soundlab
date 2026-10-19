@@ -1,0 +1,11 @@
+{
+  "name": "vibe-soundlab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Interactive, guided sound design lessons for modern D&B, in the browser.",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "test": "node --test"
+  }
+}
