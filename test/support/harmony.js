@@ -78,6 +78,32 @@ export function padVoicings(haps) {
   return [...unique.values()];
 }
 
+/** The orbits a duckorbit value names: 3, "2:3" or [2, 3]. */
+export const duckTargets = (value) =>
+  [value].flat().flatMap((v) => String(v ?? '').split(':')).filter((v) => v !== '').map(Number);
+
+/**
+ * Ducking an orbit that has not played anything yet makes Strudel report
+ * "duck target orbit N does not exist". Every event that ducks an orbit must
+ * come after the first event on that orbit.
+ */
+export function earlyDucks(haps) {
+  const first = new Map();
+  for (const h of haps) {
+    if (!h.hasOnset()) continue;
+    const orbit = orbitOf(h);
+    if (!first.has(orbit) || at(h) < first.get(orbit)) first.set(orbit, at(h));
+  }
+  const problems = new Set();
+  for (const h of haps) {
+    if (h.value.duckorbit === undefined || !h.hasOnset()) continue;
+    for (const target of duckTargets(h.value.duckorbit)) {
+      if (!(first.get(target) < at(h))) problems.add(`bar ${Math.floor(at(h)) + 1}: ducks orbit ${target} before anything plays on it`);
+    }
+  }
+  return [...problems];
+}
+
 // Reverb size and delay settings belong to the orbit, not to the event:
 // two layers that set different values on one orbit keep overwriting each other.
 const BUS_PARAMS = ['roomsize', 'roomfade', 'roomlp', 'roomdim', 'delaytime', 'delayfeedback'];
