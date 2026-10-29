@@ -10,9 +10,9 @@
 //  strudel.cc öffnen → Code einfügen → Strg+Enter = Play · Strg+. = Stop
 //
 //  Laut, aber kontrolliert. Die Energie kommt aus drei Dingen:
-//  - Das Horn: drei Saws → Tiefpass mit kurzer Hüllkurve (jeder Ton beißt
-//    kurz an) → "o"-Formant (das Nebelhorn) → Diode-Verzerrung. Diode klippt
-//    weich und rund: das Horn wird laut, ohne zu kratzen.
+//  - Das Horn: zwei leicht verstimmte Saws → Tiefpass → "o"-Formant (das
+//    Nebelhorn) → starke, weiche Sättigung. Die Sättigung drückt jeden Ton auf
+//    gleichmäßige Lautstärke: das Horn wird laut und bleibt glatt.
 //  - Die Basslinie rollt im 3-3-2-Raster und rutscht von Ton zu Ton,
 //    im zweiten Teil springt sie in Oktaven ("Yoi").
 //  - Ein Supersaw-Hook aus Akkordtönen, den man mitsingen kann.
@@ -55,21 +55,25 @@ const glideB = `<[2@3 0@3 12@2 -12@3 0@3 3@2] [-3@3 0@3 7@2 -7@3 -2@3 ~@2]
                  [4@3 0@3 12@2 -12@3 0@3 -2@2] [2@3 0@3 -5@2 5@3 -2@3 -3@2]>`
 
 // ---------- BASS ----------
-// Das Horn. Unter 150 Hz ist es weggefiltert, dort spielt nur der Sub.
+// Das Horn. Unter 140 Hz ist es weggefiltert, dort spielt nur der Sub.
 // drive = "Stärke:Ausgangspegel" der Verzerrung
-const horn = (line, glide, drive = "2.6:.34") => note(line)
+// Die erste Fassung hatte einen Filter-Biss auf jedem Ton und eine leichtere
+// Diode-Verzerrung. Gemessen pulsierte sie mehr als doppelt so stark wie das
+// Nebelhorn-Horn und klang krächzend. Stärkere Sättigung glättet das: sie
+// presst jede Schwingung auf dieselbe Höhe.
+const horn = (line, glide, drive = "4:.3") => note(line)
   .penv(glide).pattack(.07)
-  .s("supersaw").unison(3).detune(.15).spread(.3)
-  .attack(.01).decay(.25).sustain(.8).release(.06)
-  .lpf(sine.range(650, 1300).slow(8)).lpenv(1.6).lpdecay(.22).lpsustain(.35).lpq(6)
-  .hpf(150)
+  .s("supersaw").unison(2).detune(.12).spread(.25)
+  .attack(.03).sustain(1).release(.08)
+  .lpf(sine.range(500, 1500).slow(8)).lpq(5)
+  .hpf(140)
   .vowel("o")
-  .distort(drive).distorttype("diode")
-  .postgain(.36).orbit(2)
+  .distort(drive)
+  .postgain(.34).orbit(2)
 
-// zweite Stimme eine Oktave höher durch den "a"-Formant: hörbar auch auf dem Handy
-const hornTop = (line, glide) => horn(line, glide, "3:.3")
-  .add(note(12)).vowel("a").hpf(400).postgain(.14)
+// zweite Stimme eine Oktave höher, leise: hörbar auch auf dem Handy
+const hornTop = (line, glide) => horn(line, glide, "4.5:.28")
+  .add(note(12)).hpf(300).postgain(.12)
 
 // Sub: reiner Sinus, rutscht mit dem Horn mit und trägt den Druck
 const sub = (line, glide) => note(line)
@@ -195,7 +199,7 @@ const intro = stack(
   pad().lpf(saw.range(500, 2000).slow(16)),
   hats.mask("<0!4 1!12>"), oh.mask("<0!8 1!8>"),
   kick.mask("<0!4 1!12>"), snare.mask("<0!8 1!8>"),
-  horn(lineA, glideA).lpf(saw.range(200, 700).slow(8)).lpenv(1).postgain(.24).mask("<0!8 1!8>"),
+  horn(lineA, glideA).lpf(saw.range(200, 700).slow(8)).postgain(.24).mask("<0!8 1!8>"),
   sub(lineA, glideA).gain(.45).mask("<0!8 1!8>"),
   hook(.5).lpf(1200).mask("<0!12 1!4>"),
 )
@@ -224,15 +228,15 @@ const breakdown = stack(
 const build2 = stack(
   pad().lpf(saw.range(800, 3000).slow(8)), hook(.7),
   roll, riser, sweep, revcrash, brk.mask("<0!4 1!2 0!2>"),
-  horn(lineB, glideB, "3:.3").lpf(saw.range(300, 1800).slow(8)).postgain(saw.range(.16, .34).slow(8)),
+  horn(lineB, glideB, "4.5:.28").lpf(saw.range(300, 1800).slow(8)).postgain(saw.range(.16, .34).slow(8)),
 ).mask("<1!7 [1@3 0]>")
 
 // zweiter Drop: mehr Zerre, Hook durchgehend, Ride und Break, Oberstimme am Horn
 const drop2 = stack(
   kick, snare, ghosts, hats, ride, brk, crash, impact,
   arrange(
-    [16, bass(lineB, glideB, "3:.3")],
-    [16, stack(bass(lineA, glideA, "3:.3"), hornTop(lineA, glideA))],
+    [16, bass(lineB, glideB, "4.5:.28")],
+    [16, stack(bass(lineA, glideA, "4.5:.28"), hornTop(lineA, glideA))],
   ),
   hook(.7), stab, pad(.5, 3),
 )
