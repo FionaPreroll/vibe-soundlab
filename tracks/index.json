@@ -1,0 +1,44 @@
+{
+  "tracks": [
+    {
+      "file": "nachtschicht.js",
+      "title": "Nachtschicht",
+      "style": "Dark techstep",
+      "bpm": 174,
+      "key": "F minor",
+      "bars": 120,
+      "order": 1,
+      "about": "Driving reese in the style of Dom & Roland, over a breathing pad on an F pedal."
+    },
+    {
+      "file": "nebelhorn.js",
+      "title": "Nebelhorn",
+      "style": "Deep roller",
+      "bpm": 174,
+      "key": "E minor",
+      "bars": 112,
+      "order": 2,
+      "about": "A distorted foghorn bass calls across a rolling beat and a cold, wide pad."
+    },
+    {
+      "file": "glasregen.js",
+      "title": "Glasregen",
+      "style": "Liquid / atmospheric",
+      "bpm": 172,
+      "key": "C minor",
+      "bars": 128,
+      "order": 3,
+      "about": "Two-step liquid roller: glassy FM keys, a bell melody and rain made of glass taps."
+    },
+    {
+      "file": "polarlicht.js",
+      "title": "Polarlicht",
+      "style": "Ambient jungle",
+      "bpm": 170,
+      "key": "D minor",
+      "bars": 128,
+      "order": 4,
+      "about": "Chopped amen and a deep 808 sub under a choir pad, with a halftime breakdown."
+    }
+  ]
+}

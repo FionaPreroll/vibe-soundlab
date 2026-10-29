@@ -1,43 +1,92 @@
-# Vibe Soundlab
+# Vibe Soundlab Tracks
 
-Interactive, guided sound design lessons for modern drum & bass, in the browser.
-The first lesson builds a foghorn bass step by step: wavetable oscillator and unison,
-pitch drop, controlled overdrive, filter movement and a clean sub. A live spectrum
-compares your sound with the lesson's target patch.
+Atmospheric drum & bass written in [Strudel](https://strudel.cc/), and a browser player for it.
+Pick one of the tracks in this repo, or upload your own Strudel file and play it next to them.
 
-The controls follow the vocabulary of Vital and Serum, so what you learn here carries
-straight over to those synths.
+The live player: https://fionapreroll.github.io/vibe-soundlab/
+
+> The sound design lessons (the foghorn lesson app) live on the
+> [`soundlab`](https://github.com/FionaPreroll/vibe-soundlab/tree/soundlab) branch and are maintained
+> separately. Only this branch, `main`, is published to GitHub Pages.
+
+## Tracks
+
+| Track | Style | Key | BPM |
+| --- | --- | --- | --- |
+| [Nachtschicht](tracks/nachtschicht.js) | Dark techstep, Dom & Roland style reese | F minor | 174 |
+| [Nebelhorn](tracks/nebelhorn.js) | Deep roller with a distorted foghorn bass | E minor | 174 |
+| [Glasregen](tracks/glasregen.js) | Liquid two-step, FM keys, bells, glass rain | C minor | 172 |
+| [Polarlicht](tracks/polarlicht.js) | Ambient jungle, chopped amen, 808 sub, halftime breakdown | D minor | 170 |
+
+Every track is a plain Strudel file: paste it into strudel.cc, or use the player's
+"Open in strudel.cc" link, and it runs there too.
+
+### Conventions the tests rely on
+
+Each track starts with a header the player reads:
+
+```js
+// @title Nachtschicht
+// @style Dark techstep
+// @bpm 174
+// @key F minor
+// @bars 120
+// @order 1
+// @about One line for the player.
+```
+
+Layers use fixed orbits. Reverb size and delay settings belong to an orbit, so two layers
+with different settings on one orbit keep overwriting each other.
+
+| Orbit | Layer |
+| --- | --- |
+| 1 | drums (default) |
+| 2 | bass |
+| 3 | pad (the kick ducks this orbit) |
+| 4 | snare room |
+| 5 | stabs, keys |
+| 6 | arps, plucks, leads |
+| 7 | FX and atmosphere |
+
+After adding or renaming a track, run `npm run tracks` to update `tracks/index.json`.
 
 ## Run it
 
-No build step and no dependencies. Serve the folder and open it in a browser:
-
 ```sh
-npm start        # python3 -m http.server 8000
-# then open http://localhost:8000
+npm install
+npm start        # serves the folder at http://localhost:8000
 ```
 
-Opening `index.html` straight from disk does not work, because browsers block ES modules on `file://`.
+Strudel itself loads from the jsDelivr CDN (`@strudel/web`, pinned in `src/engine.js`).
+Uploaded tracks are kept in the browser's local storage.
 
 ## Tests
 
 ```sh
-npm test         # node --test, needs Node 18+
+npm test         # all unit and track tests
+npm run coverage # the same, failing below 95 % line coverage of src/
+npm run e2e      # plays every track in headless Chromium (needs Playwright)
 ```
+
+The track tests run each file through the real Strudel pattern engine in Node and check
+every event of the whole arrangement:
+
+- stab, key and arp notes are tones of the pad chord sounding under them;
+- on every downbeat the bass is a chord tone with no chord tone a semitone above it;
+- no minor seconds or minor ninths between harmony notes that sound together;
+- pad chords are in open position (at least 17 semitones wide, nothing below G2);
+- the kick ducks the pad, and layers on one orbit agree on its reverb and delay;
+- every sound and sample number exists, every bar plays something, levels stay sane.
+
+`test/reference.test.js` runs the same checks on the first version of Nachtschicht
+(`test/fixtures/nachtschicht-v1.js`) and confirms they catch what was wrong with it.
 
 ## Layout
 
 | Path | What it holds |
 | --- | --- |
-| `js/engine.js` | Web Audio engine: foghorn synth, synthesized 174 BPM drum loop, sidechain, limiter, meters |
-| `js/lesson.js` | The foghorn lesson: controls, start and target patches, steps and their checks |
-| `js/dsp.js` | Pure helpers: wavetables, distortion curves, FFT, band analysis |
-| `js/spectrum.js` | Spectrum and oscilloscope drawing |
-| `js/ui.js` | Knob and selector widgets |
-| `js/main.js` | Wires everything together |
-
-## Notes
-
-- The loudness meter is an approximation of short-term LUFS (K-weighting with two biquads per channel).
-- The band check removes the overall volume difference and compares tonal balance only.
-- Settings are kept in the browser's local storage.
+| `tracks/` | the Strudel tracks and `index.json` |
+| `index.html`, `css/` | the player page |
+| `src/` | player code: engine (Strudel), library (repo tracks and uploads), upload checks, header parsing, strudel.cc links |
+| `scripts/` | `index-tracks.js` (track index), `snapshot-samples.js` (sample names for the tests) |
+| `test/` | tests; `test/support/` runs Strudel in Node and holds the harmony checks |
