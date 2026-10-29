@@ -35,7 +35,7 @@ test('the distortion and vowel lists come from the audio engine', () => {
   for (const name of ['a', 'e', 'i', 'o', 'u']) assert.ok(VOWELS.has(name), name);
 });
 
-test('tracks/index.json matches the track headers (run `npm run tracks` to update)', () => {
+test('tracks/index.json matches the track headers (run `pnpm run tracks` to update)', () => {
   assert.equal(readFileSync(new URL('index.json', TRACK_DIR), 'utf8'), serialize(buildIndex()));
 });
 

@@ -1,0 +1,10 @@
+# The coverage minimum is enforced by `pnpm run coverage` in CI (see package.json),
+# so Codecov only reports and never marks a pull request as failed.
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true

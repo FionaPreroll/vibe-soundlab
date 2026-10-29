@@ -1,6 +1,6 @@
 // Browser smoke test: serves the site, loads Strudel from the CDN, plays every
 // repo track for a few seconds and fails on any error Strudel or the page reports.
-// Needs Playwright with Chromium and network access: npm run e2e
+// Needs Playwright with Chromium and network access: pnpm run e2e
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';

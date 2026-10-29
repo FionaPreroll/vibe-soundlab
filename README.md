@@ -1,5 +1,7 @@
 # Vibe Soundlab Tracks
 
+[![codecov](https://codecov.io/gh/FionaPreroll/vibe-soundlab/branch/main/graph/badge.svg)](https://codecov.io/gh/FionaPreroll/vibe-soundlab)
+
 Drum & bass written in [Strudel](https://strudel.cc/), and a browser player for it: four atmospheric
 tracks and three bangers.
 Pick one of the tracks in this repo, or upload your own Strudel file and play it next to them.
@@ -55,13 +57,16 @@ with different settings on one orbit keep overwriting each other.
 | 6 | arps, plucks, leads |
 | 7 | FX and atmosphere |
 
-After adding or renaming a track, run `npm run tracks` to update `tracks/index.json`.
+After adding or renaming a track, run `pnpm run tracks` to update `tracks/index.json`.
 
 ## Run it
 
+The project uses [pnpm](https://pnpm.io/installation). `package.json` pins its version
+(`packageManager`), and pnpm or `corepack enable` switch to that version on their own.
+
 ```sh
-npm install
-npm start        # serves the folder at http://localhost:8000
+pnpm install
+pnpm start        # serves the folder at http://localhost:8000
 ```
 
 Strudel itself loads from the jsDelivr CDN (`@strudel/web`, pinned in `src/engine.js`).
@@ -70,10 +75,14 @@ Uploaded tracks are kept in the browser's local storage.
 ## Tests
 
 ```sh
-npm test         # all unit and track tests
-npm run coverage # the same, failing below 95 % line coverage of src/
-npm run e2e      # plays every track in headless Chromium (needs Playwright)
+pnpm test         # all unit and track tests
+pnpm run coverage # the same, failing below 95 % line coverage of src/; writes lcov.info
+pnpm run e2e      # plays every track in headless Chromium (needs Playwright)
 ```
+
+CI uploads `lcov.info` to [Codecov](https://codecov.io/gh/FionaPreroll/vibe-soundlab) on every
+push and pull request (repository secret `CODECOV_TOKEN`). The 95 % minimum is checked by
+`pnpm run coverage` itself; Codecov only reports (`codecov.yml`).
 
 The track tests run each file through the real Strudel pattern engine in Node and check
 every event of the whole arrangement:

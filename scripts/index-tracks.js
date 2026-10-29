@@ -1,5 +1,5 @@
 // Writes tracks/index.json from the headers of the files in tracks/.
-// Run after adding or renaming a track: npm run tracks
+// Run after adding or renaming a track: pnpm run tracks
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
