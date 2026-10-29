@@ -3,6 +3,9 @@
 Drum & bass written in [Strudel](https://strudel.cc/), and a browser player for it: four atmospheric
 tracks and three bangers.
 Pick one of the tracks in this repo, or upload your own Strudel file and play it next to them.
+Play runs through the list: when a track reaches its last bar (`@bars`), the next one starts.
+The repeat button switches between off (stop after the last track), all (start over) and one
+(repeat the current track). Uploads without a `@bars` header loop until you pick another track.
 
 The live player: https://fionapreroll.github.io/vibe-soundlab/
 
@@ -94,6 +97,6 @@ every event of the whole arrangement:
 | --- | --- |
 | `tracks/` | the Strudel tracks and `index.json` |
 | `index.html`, `css/` | the player page |
-| `src/` | player code: engine (Strudel), library (repo tracks and uploads), upload checks, header parsing, strudel.cc links |
+| `src/` | player code: engine (Strudel), library (repo tracks and uploads), playlist and repeat rules, upload checks, header parsing, strudel.cc links |
 | `scripts/` | `index-tracks.js` (track index), `snapshot-samples.js` (sample names for the tests) |
 | `test/` | tests; `test/support/` runs Strudel in Node and holds the harmony checks |

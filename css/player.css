@@ -79,6 +79,8 @@ a { color: var(--accent); }
 .play { background: var(--accent); color: var(--accent-ink); border: 0; padding: 8px 22px; font-weight: 600; min-width: 92px; }
 .play:disabled { opacity: .5; cursor: default; }
 .ghost { background: none; color: var(--text); border: 1px solid var(--line); width: 36px; height: 36px; font-size: 1.2rem; line-height: 1; }
+.repeat { background: none; color: var(--muted); border: 1px solid var(--line); padding: 7px 14px; font-size: .9rem; }
+.repeat[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
 .status { min-height: 1.5em; color: var(--muted); margin: 10px 0 0; overflow-wrap: anywhere; }
 .status .error { color: var(--error); }
 .progress { font-variant-numeric: tabular-nums; }

@@ -248,7 +248,7 @@ test('shows the bar position while playing', async () => {
   assert.equal($('[data-role=progress]').textContent, '');
   click($('[data-role=play]'));
   await settle();
-  engine.pos = 125.3;
+  engine.pos = 5.3;
   app.updateProgress();
   assert.equal($('[data-role=progress]').textContent, 'Bar 6 / 120');
   await app.addFiles([fileLike('loop.js', 's("bd")')]);
@@ -338,4 +338,99 @@ test('stopping while a track loads keeps it silent', async () => {
   assert.equal(engine.stops, 2);
   assert.match($('[data-role=status]').textContent, /Stopped/);
   assert.equal($('[data-role=play]').textContent, 'Play');
+});
+
+const repeatButton = () => $('[data-role=repeat]');
+const finish = async (app, engine, bars = 200) => {
+  engine.pos = bars;
+  app.updateProgress();
+  await settle();
+};
+
+test('when a track ends, the next one starts', async () => {
+  const { app, engine } = await start();
+  click($('[data-role=play]'));
+  await settle();
+  engine.pos = 119.9;
+  app.updateProgress();
+  assert.equal(engine.played.length, 1, 'not before the end');
+  await finish(app, engine, 120);
+  assert.equal(engine.played.length, 2);
+  assert.match(engine.played[1], /NEBELHORN/);
+  assert.match($('[data-role=status]').textContent, /Playing Nebelhorn/);
+});
+
+test('repeat off stops after the last track', async () => {
+  const { app, engine } = await start();
+  app.select('repo:starkstrom');
+  click($('[data-role=play]'));
+  await settle();
+  await finish(app, engine);
+  assert.equal(engine.played.length, 1);
+  assert.equal(engine.stops, 1);
+  assert.match($('[data-role=status]').textContent, /End of playlist/);
+  assert.equal($('[data-role=play]').textContent, 'Play');
+});
+
+test('repeat all starts over, repeat one plays the same track again', async () => {
+  const storage = new MemoryStorage();
+  const { app, engine } = await start({ storage });
+  assert.equal(repeatButton().textContent, 'Repeat off');
+  click(repeatButton());
+  assert.equal(repeatButton().textContent, 'Repeat all');
+  assert.equal(repeatButton().getAttribute('aria-pressed'), 'true');
+  assert.equal(storage.data['vibe-player:repeat'], 'all');
+
+  app.select('repo:starkstrom');
+  click($('[data-role=play]'));
+  await settle();
+  await finish(app, engine);
+  assert.match(engine.played.at(-1), /NACHTSCHICHT/);
+
+  click(repeatButton());
+  assert.equal(repeatButton().textContent, 'Repeat one');
+  await finish(app, engine);
+  assert.match(engine.played.at(-1), /NACHTSCHICHT/);
+  assert.equal($('[data-role=title]').textContent, 'Nachtschicht');
+
+  click(repeatButton());
+  assert.equal(repeatButton().textContent, 'Repeat off');
+  assert.equal(repeatButton().getAttribute('aria-pressed'), 'false');
+});
+
+test('the repeat mode is remembered', async () => {
+  const storage = new MemoryStorage();
+  storage.setItem('vibe-player:repeat', 'one');
+  await start({ storage });
+  assert.equal(repeatButton().textContent, 'Repeat one');
+});
+
+test('blocked storage does not break repeat', async () => {
+  const storage = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } };
+  const { app } = await start({ storage });
+  assert.equal(repeatButton().textContent, 'Repeat off');
+  app.cycleRepeat();
+  assert.equal(repeatButton().textContent, 'Repeat all');
+});
+
+test('uploads without a length keep looping', async () => {
+  const { app, engine } = await start();
+  await app.addFiles([fileLike('loop.js', 's("bd")')]);
+  click($('[data-role=play]'));
+  await settle();
+  await finish(app, engine, 500);
+  assert.equal(engine.played.length, 1);
+  assert.equal($('[data-role=progress]').textContent, 'Bar 501');
+});
+
+test('no auto-advance while the next track is still loading', async () => {
+  const engine = slowEngine();
+  const { app } = await start({ engine });
+  app.play();
+  engine.pending[0].resolve();
+  await settle();
+  engine.pos = 120;
+  app.updateProgress();
+  app.updateProgress();
+  assert.equal(engine.played.length, 2);
 });

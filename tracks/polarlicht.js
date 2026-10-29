@@ -79,21 +79,29 @@ const pluck = note(pluckNotes)
   .room(.5).roomsize(6).orbit(6)
 
 // ---------- DRUMS ----------
-// Amen in Scheiben, neu zusammengesetzt; jeder 4. Takt bekommt eine andere Variante
-const amenA = n("0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15")
-const amenB = n("0 1 [2 2] 3 ~ 5 6 [7 9] 8 ~ 10 [11 11] 12 13 [14 30] 15")
-const amenC = n("0 ~ 2 0 4 5 [6 6] 7 [24 25] 9 10 [26 27] 12 [13 13] 14 [15 31]")
-const amen = (pat) => pat.s("amencutup").cut(1).hpf(90).shape(.25).postgain(.55)
+// Amen: die 32 Schnipsel von "amencutup" sind unterschiedlich lang, weil sie an den
+// Schlägen geschnitten sind. Jeder bekommt deshalb genau seine Originallänge
+// (Gewicht = Länge in 16teln), so ergeben sie lückenlos den echten Break.
+// speed passt die Originalgeschwindigkeit (1,61 s pro Takt) an 170 BPM an.
+const amenBars = [
+  "0@2.68 1@2.80 2@2.91 3@1.40 4@1.27 5@1.14 6@1.37 7@1.56 8@1.01",
+  "9@2.88 10@2.67 11@2.79 12@2.67 13@2.78 14@1.36 15@1.27",
+  "16@1.29 17@1.16 18@2.88 19@2.57 20@2.86 21@1.43 22@1.12 23@1.42 24@1.15",
+  "25@2.83 26@1.38 27@1.43 28@1.09 29@1.19 30@5.49 31@2.14",
+]
+const amenSpeed = 1.6105 / bar
+// Edits nur taktweise: ganze Takte des Breaks werden umgestellt, nichts zerhackt
+const amen = (...bars) => n(cat(...bars.map(i => amenBars[i])))
+  .s("amencutup").speed(amenSpeed).cut(1).hpf(90).shape(.15).postgain(.55)
 
-const jungle = amen(cat(amenA, amenB, amenA, amenC))
-const jungle2 = amen(cat(amenB, amenC, amenA, amenC)).sometimesBy(.15, x => x.speed(1.5))
+const jungle = amen(0, 1, 2, 3)
+const jungle2 = amen(0, 1, 0, 3, 2, 1, 2, 3)
 
-const kick = s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~").bank("RolandTR909").n(2)
-  .lpf(2500).postgain(.35)
-  .duckorbit(3).duckdepth(.3).duckattack(.25)
-
-const snare = s("sd").beat("4,12", 16).bank("RolandTR909").n(6)
-  .hpf(200).postgain(.2).room(.25).roomsize(3).orbit(4)
+// Der Amen ist das Schlagzeug. Darunter nur eine Sub-Kick auf der Eins, wo auch der
+// Amen seine Kick hat (sonst flammt es). Sie gibt Druck und duckt das Pad.
+const kick = s("bd").bank("RolandTR909").n(2)
+  .lpf(900).postgain(.3)
+  .duckorbit(3).duckdepth(.3).duckattack(.4)
 
 const ride = s("rd*8").bank("RolandTR909").n(1).gain("[.08 .14]*4").hpf(3000)
 
@@ -135,7 +143,7 @@ const build = stack(
 ).mask("<1!7 [1@3 0]>")
 
 const drop1 = stack(
-  jungle, kick, snare, crash, wind.gain(.06),
+  jungle, kick, crash, wind.gain(.06),
   bass(), pad(.75), pluck.gain(.1).mask("<0!16 1!16>"),
 )
 
@@ -153,7 +161,7 @@ const build2 = stack(
 ).mask("<1!7 [1@3 0]>")
 
 const drop2 = stack(
-  jungle2, kick, snare, ride, crash,
+  jungle2, kick, ride, crash,
   bass(), pad(.75), pluck.gain(.1),
 ).lastOf(8, x => x.mask("[1 1 1 [1 0]]"))
 
