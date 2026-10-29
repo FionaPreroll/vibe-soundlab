@@ -97,7 +97,7 @@ const ghosts = s("sd").beat("3,7,9,14", 16).bank("LinnDrum").n(1)
   .gain("[.12 .08 .1 .07]").hpf(800)
 
 const shaker = s("sh*16").bank("LinnDrum")
-  .gain("[.12 .22 .16 .22]*4").hpf(4000).pan(sine.range(.35, .65).slow(2))
+  .gain("[.05 .09 .06 .09]*4").hpf(5000).pan(sine.range(.35, .65).slow(2))
 
 const hats = s("[~ hh]*4").bank("RolandTR909").gain(.18).hpf(6000)
 

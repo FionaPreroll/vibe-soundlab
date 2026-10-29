@@ -3,6 +3,7 @@
 import { loadCatalog } from './catalog.js';
 import { durationSeconds, formatDuration } from './header.js';
 import { Library } from './library.js';
+import { REPEAT_LABELS, hasEnded, nextRepeatMode, parseRepeatMode, trackAfter } from './playlist.js';
 import { strudelUrl } from './share.js';
 import { readUpload } from './upload.js';
 
@@ -27,7 +28,14 @@ export function describeTrack(meta) {
 export async function createApp({ root, engine, fetchFn, storage = null, location = null }) {
   const doc = root.ownerDocument;
   const library = new Library({ storage });
-  const state = { selected: null, playing: null, loading: null, status: '', error: false };
+  const REPEAT_KEY = 'vibe-player:repeat';
+  let storedRepeat = null;
+  try {
+    storedRepeat = storage?.getItem(REPEAT_KEY) ?? null;
+  } catch {
+    // Blocked storage: start with repeat off.
+  }
+  const state = { selected: null, playing: null, loading: null, status: '', error: false, repeat: parseRepeatMode(storedRepeat) };
 
   const q = (sel) => root.querySelector(sel);
   const list = q('[data-role=list]');
@@ -41,6 +49,7 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   const fileInput = q('[data-role=file]');
   const dropZone = q('[data-role=drop]');
   const progress = q('[data-role=progress]');
+  const repeatButton = q('[data-role=repeat]');
 
   function setStatus(text, error = false) {
     state.status = text;
@@ -85,6 +94,9 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     playButton.textContent = isLoading ? 'Loading…' : isPlaying ? 'Stop' : 'Play';
     playButton.setAttribute('aria-pressed', String(isPlaying));
     playButton.disabled = !track || isLoading;
+    repeatButton.textContent = REPEAT_LABELS[state.repeat];
+    repeatButton.dataset.mode = state.repeat;
+    repeatButton.setAttribute('aria-pressed', String(state.repeat !== 'off'));
   }
 
   function render() {
@@ -163,11 +175,32 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     return added;
   }
 
+  function cycleRepeat() {
+    state.repeat = nextRepeatMode(state.repeat);
+    try {
+      storage?.setItem(REPEAT_KEY, state.repeat);
+    } catch {
+      // Not remembered, but still works for this visit.
+    }
+    renderNow();
+  }
+
+  /** Called a few times a second: shows the bar and moves on when a track ends. */
   function updateProgress() {
     const track = library.get(state.playing);
     const pos = engine.position();
     if (!track || pos == null) {
       progress.textContent = '';
+      return;
+    }
+    if (state.loading === null && hasEnded(pos, track.meta.bars)) {
+      const next = trackAfter(library.list().map((t) => t.id), track.id, state.repeat);
+      if (next === null) {
+        stop();
+        setStatus('End of playlist');
+      } else {
+        select(next, { autoplay: true });
+      }
       return;
     }
     const bars = track.meta.bars;
@@ -176,6 +209,7 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   }
 
   playButton.addEventListener('click', () => toggle());
+  repeatButton.addEventListener('click', () => cycleRepeat());
   q('[data-role=prev]').addEventListener('click', () => select(library.neighbour(state.selected, -1)?.id, { autoplay: state.playing !== null }));
   q('[data-role=next]').addEventListener('click', () => select(library.neighbour(state.selected, 1)?.id, { autoplay: state.playing !== null }));
   fileInput.addEventListener('change', async () => {
@@ -219,5 +253,5 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   state.selected = (wanted ?? library.list()[0])?.id ?? null;
   render();
 
-  return { library, state, select, play, stop, toggle, addFiles, removeUpload, updateProgress };
+  return { library, state, select, play, stop, toggle, addFiles, removeUpload, updateProgress, cycleRepeat };
 }

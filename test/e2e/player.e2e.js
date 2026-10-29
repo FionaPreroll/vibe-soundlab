@@ -72,6 +72,18 @@ try {
     const expected = Math.ceil((SECONDS_PER_TRACK * Number(status.match(/(\d+) BPM/)?.[1] ?? 174)) / 240) + 2;
     if (!(bar >= 1 && bar <= expected)) problems.push(`${titles[i]}: expected to start from bar 1, now at ${progress}`);
   }
+
+  // Playlist: a two-bar upload at the end of the list, repeat all → Nachtschicht follows it.
+  await page.setInputFiles('[data-role=file]', {
+    name: 'short.js',
+    mimeType: 'text/javascript',
+    buffer: Buffer.from('// @title Short\n// @bpm 174\n// @bars 2\nsetcpm(174 / 4)\ns("bd*4").bank("RolandTR909")\n'),
+  });
+  await page.waitForFunction(() => document.querySelector('[data-role=title]').textContent === 'Short');
+  while ((await page.textContent('[data-role=repeat]')) !== 'Repeat all') await page.click('[data-role=repeat]');
+  await page.click('[data-role=play]');
+  await page.waitForFunction(() => /Playing Nachtschicht/.test(document.querySelector('[data-role=status]').textContent), null, { timeout: 30000 });
+  console.log('playlist: Short → Nachtschicht');
   await page.click('[data-role=play]');
 } finally {
   await browser.close();
