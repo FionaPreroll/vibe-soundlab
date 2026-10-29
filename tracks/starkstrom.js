@@ -162,7 +162,9 @@ const shaker = s("sh*16").bank("RolandTR808")
 
 const oh = s("[~ oh]*4").bank("RolandTR909").n(2).gain(.14).hpf(6000).cut(3)
 
-const brk = s("breaks157").fit().hpf(600).gain(.26)
+// Break-Tops: breaks165 ist genau ein Takt lang und wird per fit() auf einen
+// Takt gestreckt. (breaks157 ist 1,19 Takte lang, gequetscht stolperte es.)
+const brk = s("breaks165").fit().hpf(600).gain(.26)
 
 const crash = s("<cr ~!7>").bank("RolandTR909").n(0).hpf(300).gain(.26)
 
@@ -191,7 +193,7 @@ const impact = s("<white ~!31>")
 
 const preload = stack(
   s("bd:0 sd:6 oh:2 cr:0").bank("RolandTR909"), s("sh").bank("RolandTR808"),
-  s("realclaps:1 breaks157"),
+  s("realclaps:1 breaks165"),
 ).gain(0)
 
 // ---------- ARRANGEMENT ----------
