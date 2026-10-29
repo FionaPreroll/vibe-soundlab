@@ -1,0 +1,93 @@
+:root {
+  --bg: #0d1117;
+  --panel: #151b24;
+  --line: #263041;
+  --text: #e6edf3;
+  --muted: #8b98a9;
+  --accent: #7cc4ff;
+  --accent-ink: #06121f;
+  --error: #ff8a80;
+  --radius: 10px;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f5f7fa;
+    --panel: #ffffff;
+    --line: #d8dee8;
+    --text: #18202b;
+    --muted: #5a6677;
+    --accent: #0b6bcb;
+    --accent-ink: #ffffff;
+    --error: #b3261e;
+    color-scheme: light;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+a { color: var(--accent); }
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  grid-template-areas: "top top" "library now";
+  gap: 20px;
+}
+
+.top { grid-area: top; }
+.top h1 { margin: 0; font-size: 1.6rem; letter-spacing: .01em; }
+.top h1 span { color: var(--muted); font-weight: 400; }
+.top p { margin: 4px 0 0; color: var(--muted); }
+
+.library { grid-area: library; display: flex; flex-direction: column; gap: 12px; }
+.tracks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.track { display: flex; align-items: stretch; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.track.selected { border-color: var(--accent); }
+.track .pick { flex: 1; text-align: left; background: none; border: 0; color: inherit; padding: 10px 12px; cursor: pointer; font: inherit; display: flex; flex-direction: column; min-width: 0; }
+.track .name { font-weight: 600; }
+.track .sub { color: var(--muted); font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.track.playing .name::before { content: "▶ "; color: var(--accent); }
+.track.uploaded .name::after { content: " · uploaded"; color: var(--muted); font-weight: 400; font-size: .8rem; }
+.track .remove { background: none; border: 0; color: var(--muted); font-size: 1.2rem; padding: 0 12px; cursor: pointer; }
+.track .remove:hover { color: var(--error); }
+
+.drop { display: flex; flex-direction: column; gap: 2px; border: 1px dashed var(--line); border-radius: var(--radius); padding: 14px; cursor: pointer; color: var(--muted); }
+.drop strong { color: var(--text); }
+.drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.now { grid-area: now; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; min-width: 0; }
+.now-head { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.now h2 { margin: 0; font-size: 1.4rem; }
+.details { margin: 2px 0 0; color: var(--muted); }
+.about { margin: 12px 0 0; }
+.transport { display: flex; gap: 8px; align-items: center; }
+.transport button { font: inherit; border-radius: 999px; cursor: pointer; }
+.play { background: var(--accent); color: var(--accent-ink); border: 0; padding: 8px 22px; font-weight: 600; min-width: 92px; }
+.play:disabled { opacity: .5; cursor: default; }
+.ghost { background: none; color: var(--text); border: 1px solid var(--line); width: 36px; height: 36px; font-size: 1.2rem; line-height: 1; }
+.status { min-height: 1.5em; color: var(--muted); margin: 10px 0 0; overflow-wrap: anywhere; }
+.status .error { color: var(--error); }
+.progress { font-variant-numeric: tabular-nums; }
+
+.source { margin-top: 14px; }
+.source summary { cursor: pointer; color: var(--muted); }
+.source summary a { margin-left: 12px; }
+.source pre { margin: 10px 0 0; max-height: 60vh; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-size: 12.5px; line-height: 1.45; }
+
+@media (max-width: 720px) {
+  .app { grid-template-columns: 1fr; grid-template-areas: "top" "now" "library"; }
+}
