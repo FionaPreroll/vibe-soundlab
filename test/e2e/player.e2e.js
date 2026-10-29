@@ -53,7 +53,11 @@ try {
   for (let i = 0; i < titles.length; i++) {
     await page.click(`.track:nth-child(${i + 1}) .pick`);
     if ((await page.textContent('[data-role=play]')) === 'Play') await page.click('[data-role=play]');
-    await page.waitForFunction(() => /Playing|Could not/.test(document.querySelector('[data-role=status]').textContent), null, { timeout: 60000 });
+    await page.waitForFunction(
+      (title) => new RegExp(`Playing ${title}|Could not`).test(document.querySelector('[data-role=status]').textContent),
+      titles[i],
+      { timeout: 60000 },
+    );
     const status = await page.textContent('[data-role=status]');
     if (!status.startsWith('Playing')) problems.push(`${titles[i]}: ${status}`);
     await page.waitForTimeout(SECONDS_PER_TRACK * 1000);

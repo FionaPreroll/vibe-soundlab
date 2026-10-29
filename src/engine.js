@@ -37,8 +37,18 @@ export function createEngine({ load = () => import(STRUDEL_URL) } = {}) {
     return ready;
   }
 
+  // Plays run one after another: a second click while a track is still
+  // loading must not interleave its hush and evaluate with the first.
+  let queue = Promise.resolve();
+
   /** Evaluates and starts the code. Throws if Strudel reports an error in it. */
-  async function play(code) {
+  function play(code) {
+    const run = queue.then(() => playNow(code));
+    queue = run.catch(() => {});
+    return run;
+  }
+
+  async function playNow(code) {
     await init();
     await strudel.getAudioContext?.().resume?.();
     evalError = null;

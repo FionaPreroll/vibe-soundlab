@@ -82,3 +82,34 @@ test('a failed load can be retried', async () => {
   await engine.init();
   assert.equal(strudel.calls.init, 2);
 });
+
+test('plays requested back to back run one after another', async () => {
+  const strudel = fakeStrudel();
+  const order = [];
+  let release;
+  const gate = new Promise((r) => (release = r));
+  strudel.evaluate = async (code) => {
+    order.push(`start ${code}`);
+    if (code === 'a') await gate;
+    order.push(`end ${code}`);
+    return { pattern: true };
+  };
+  const engine = createEngine({ load: async () => strudel });
+  const a = engine.play('a');
+  const b = engine.play('b');
+  await new Promise((r) => setTimeout(r, 5));
+  assert.deepEqual(order, ['start a']);
+  release();
+  await Promise.all([a, b]);
+  assert.deepEqual(order, ['start a', 'end a', 'start b', 'end b']);
+});
+
+test('a failed play does not block the next one', async () => {
+  const strudel = fakeStrudel();
+  const engine = createEngine({ load: async () => strudel });
+  strudel.evaluate = async () => undefined;
+  await assert.rejects(engine.play('bad'));
+  strudel.evaluate = async () => ({ pattern: true });
+  await engine.play('good');
+  assert.equal(engine.isPlaying(), true);
+});

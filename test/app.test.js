@@ -286,3 +286,56 @@ test('describeTrack leaves out what is unknown', () => {
   assert.equal(describeTrack({}), '');
   assert.equal(describeTrack({ style: 'Liquid', bpm: 172 }), 'Liquid · 172 BPM');
 });
+
+// An engine whose play() waits until the test lets it finish.
+function slowEngine() {
+  const engine = fakeEngine();
+  engine.pending = [];
+  engine.play = (code) =>
+    new Promise((resolve, reject) => {
+      engine.played.push(code);
+      engine.pending.push({ resolve, reject });
+    });
+  return engine;
+}
+
+test('while a track loads, the button says so and ignores clicks', async () => {
+  const engine = slowEngine();
+  await start({ engine });
+  const play = $('[data-role=play]');
+  click(play);
+  assert.equal(play.textContent, 'Loading…');
+  assert.equal(play.disabled, true);
+  click(play);
+  await settle();
+  assert.equal(engine.played.length, 1);
+  engine.pending[0].resolve();
+  await settle();
+  assert.equal(play.textContent, 'Stop');
+});
+
+test('switching tracks quickly plays the last one picked', async () => {
+  const engine = slowEngine();
+  const { app } = await start({ engine });
+  app.select('repo:nebelhorn', { autoplay: true });
+  app.select('repo:glasregen', { autoplay: true });
+  engine.pending[1].resolve();
+  await settle();
+  engine.pending[0].reject(new Error('superseded'));
+  await settle();
+  assert.match($('[data-role=status]').textContent, /Playing Glasregen/);
+  assert.equal($('.track.playing .name').textContent, 'Glasregen');
+});
+
+test('stopping while a track loads keeps it silent', async () => {
+  const engine = slowEngine();
+  const { app } = await start({ engine });
+  app.play();
+  app.stop();
+  assert.equal(engine.stops, 1);
+  engine.pending[0].resolve();
+  await settle();
+  assert.equal(engine.stops, 2);
+  assert.match($('[data-role=status]').textContent, /Stopped/);
+  assert.equal($('[data-role=play]').textContent, 'Play');
+});

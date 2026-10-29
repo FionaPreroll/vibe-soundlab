@@ -27,7 +27,7 @@ export function describeTrack(meta) {
 export async function createApp({ root, engine, fetchFn, storage = null, location = null }) {
   const doc = root.ownerDocument;
   const library = new Library({ storage });
-  const state = { selected: null, playing: null, status: '', error: false };
+  const state = { selected: null, playing: null, loading: null, status: '', error: false };
 
   const q = (sel) => root.querySelector(sel);
   const list = q('[data-role=list]');
@@ -81,9 +81,10 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     code.textContent = track ? track.code : '';
     openLink.href = track ? strudelUrl(track.code) : 'https://strudel.cc/';
     const isPlaying = track !== null && state.playing === track.id;
-    playButton.textContent = isPlaying ? 'Stop' : 'Play';
+    const isLoading = track !== null && state.loading === track.id;
+    playButton.textContent = isLoading ? 'Loading…' : isPlaying ? 'Stop' : 'Play';
     playButton.setAttribute('aria-pressed', String(isPlaying));
-    playButton.disabled = !track;
+    playButton.disabled = !track || isLoading;
   }
 
   function render() {
@@ -101,22 +102,39 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     return null;
   }
 
+  // Every play or stop request gets a number; when an older request finishes
+  // after a newer one was made, its result is dropped.
+  let request = 0;
+
   async function play() {
     const track = library.get(state.selected);
-    if (!track) return;
+    if (!track || state.loading === track.id) return;
+    const mine = ++request;
+    state.loading = track.id;
     setStatus(`Loading ${track.meta.title}…`);
+    renderNow();
     try {
       await engine.play(track.code);
+      if (mine !== request) {
+        // Stop was pressed while this track was loading: silence it again.
+        if (state.loading === null && state.playing === null) engine.stop();
+        return;
+      }
       state.playing = track.id;
       setStatus(`Playing ${track.meta.title}`);
     } catch (err) {
+      if (mine !== request) return;
       state.playing = null;
       setStatus(`Could not play ${track.meta.title}: ${err?.message ?? err}`, true);
+    } finally {
+      if (state.loading === track.id && mine === request) state.loading = null;
     }
     render();
   }
 
   function stop() {
+    request++;
+    state.loading = null;
     engine.stop();
     state.playing = null;
     setStatus('Stopped');
