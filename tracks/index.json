@@ -39,6 +39,36 @@
       "bars": 128,
       "order": 4,
       "about": "Chopped amen and a deep 808 sub under a choir pad, with a halftime breakdown."
+    },
+    {
+      "file": "druckwelle.js",
+      "title": "Druckwelle",
+      "style": "Dancefloor roller",
+      "bpm": 174,
+      "key": "G minor",
+      "bars": 128,
+      "order": 5,
+      "about": "A loud, overdriven foghorn bass rolls under a supersaw hook made for the dancefloor."
+    },
+    {
+      "file": "kernschmelze.js",
+      "title": "Kernschmelze",
+      "style": "Neurofunk",
+      "bpm": 174,
+      "key": "F# minor",
+      "bars": 120,
+      "order": 6,
+      "about": "A talking, wavefolded bass on an F sharp pedal, tight drums, metal stabs and lasers."
+    },
+    {
+      "file": "starkstrom.js",
+      "title": "Starkstrom",
+      "style": "Jump-up",
+      "bpm": 175,
+      "key": "A minor",
+      "bars": 120,
+      "order": 7,
+      "about": "A bouncing wub bass full of pitch bends, a hoover riff and air horns on the drop."
     }
   ]
 }

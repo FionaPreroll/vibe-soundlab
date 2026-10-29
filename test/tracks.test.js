@@ -3,17 +3,36 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, test } from 'node:test';
+// superdough is the audio engine inside @strudel/web, installed in the same pinned version
+import { distortionAlgorithms } from 'superdough/helpers.mjs';
+import { vowelFormant } from 'superdough/vowel.mjs';
 import { buildIndex, serialize } from '../scripts/index-tracks.js';
-import { ORBIT, bassClashes, busConflicts, dissonances, overLayerClashes, padVoicings } from './support/harmony.js';
+import {
+  ORBIT,
+  bassClashes,
+  busConflicts,
+  dissonances,
+  duckTargets,
+  earlyDucks,
+  overLayerClashes,
+  padVoicings,
+} from './support/harmony.js';
 import { toMidi } from './support/strudel.js';
 import { analyseTrack, trackFiles, TRACK_DIR } from './support/tracks.js';
 
 const banks = JSON.parse(readFileSync(new URL('./fixtures/sample-banks.json', import.meta.url), 'utf8'));
 const SYNTHS = new Set(['sine', 'triangle', 'square', 'sawtooth', 'supersaw', 'pulse', 'white', 'pink', 'brown', 'crackle']);
+const DISTORT_TYPES = new Set(Object.keys(distortionAlgorithms));
+const VOWELS = new Set(Object.keys(vowelFormant));
 const files = trackFiles();
 
 test('there are several tracks', () => {
-  assert.ok(files.length >= 4, `found ${files.length}`);
+  assert.ok(files.length >= 7, `found ${files.length}`);
+});
+
+test('the distortion and vowel lists come from the audio engine', () => {
+  for (const name of ['scurve', 'diode', 'fold']) assert.ok(DISTORT_TYPES.has(name), name);
+  for (const name of ['a', 'e', 'i', 'o', 'u']) assert.ok(VOWELS.has(name), name);
 });
 
 test('tracks/index.json matches the track headers (run `npm run tracks` to update)', () => {
@@ -60,6 +79,16 @@ for (const file of files) {
       assert.deepEqual([...problems], []);
     });
 
+    test('uses only distortion types and vowels the audio engine knows', async () => {
+      const { haps } = await analyseTrack(file);
+      const problems = new Set();
+      for (const { value: v } of haps) {
+        if (v.distorttype !== undefined && !DISTORT_TYPES.has(v.distorttype)) problems.add(`distorttype ${v.distorttype}`);
+        if (v.vowel !== undefined && !VOWELS.has(v.vowel)) problems.add(`vowel ${v.vowel}`);
+      }
+      assert.deepEqual([...problems], []);
+    });
+
     test('keeps every value finite and every level sane', async () => {
       const { haps } = await analyseTrack(file);
       for (const { value: v } of haps) {
@@ -102,9 +131,14 @@ for (const file of files) {
 
     test('the kick ducks the pad', async () => {
       const { haps } = await analyseTrack(file);
-      const ducking = haps.filter((h) => String(h.value.duckorbit ?? '').split(':').map(Number).includes(ORBIT.pad));
+      const ducking = haps.filter((h) => duckTargets(h.value.duckorbit).includes(ORBIT.pad));
       assert.ok(ducking.length > 0);
       assert.ok(ducking.every((h) => (h.value.orbit ?? 1) !== ORBIT.pad), 'the pad must not duck itself');
+    });
+
+    test('only ducks orbits that already play', async () => {
+      const { haps } = await analyseTrack(file);
+      assert.deepEqual(earlyDucks(haps), []);
     });
 
     test('layers that share an orbit agree on its reverb and delay', async () => {

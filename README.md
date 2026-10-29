@@ -1,6 +1,7 @@
 # Vibe Soundlab Tracks
 
-Atmospheric drum & bass written in [Strudel](https://strudel.cc/), and a browser player for it.
+Drum & bass written in [Strudel](https://strudel.cc/), and a browser player for it: four atmospheric
+tracks and three bangers.
 Pick one of the tracks in this repo, or upload your own Strudel file and play it next to them.
 
 The live player: https://fionapreroll.github.io/vibe-soundlab/
@@ -17,6 +18,9 @@ The live player: https://fionapreroll.github.io/vibe-soundlab/
 | [Nebelhorn](tracks/nebelhorn.js) | Deep roller with a distorted foghorn bass | E minor | 174 |
 | [Glasregen](tracks/glasregen.js) | Liquid two-step, FM keys, bells, glass rain | C minor | 172 |
 | [Polarlicht](tracks/polarlicht.js) | Ambient jungle, chopped amen, 808 sub, halftime breakdown | D minor | 170 |
+| [Druckwelle](tracks/druckwelle.js) | Dancefloor roller, overdriven foghorn bass, supersaw hook | G minor | 174 |
+| [Kernschmelze](tracks/kernschmelze.js) | Neurofunk, talking wavefolded bass, metal stabs, lasers | F# minor | 174 |
+| [Starkstrom](tracks/starkstrom.js) | Jump-up, bouncing wub bass with pitch bends, hoover, air horns | A minor | 175 |
 
 Every track is a plain Strudel file: paste it into strudel.cc, or use the player's
 "Open in strudel.cc" link, and it runs there too.
@@ -76,6 +80,9 @@ every event of the whole arrangement:
 - no minor seconds or minor ninths between harmony notes that sound together;
 - pad chords are in open position (at least 17 semitones wide, nothing below G2);
 - the kick ducks the pad, and layers on one orbit agree on its reverb and delay;
+- every orbit the kick ducks already plays before the first duck (otherwise Strudel reports
+  "duck target orbit does not exist");
+- distortion types and vowels are ones Strudel knows;
 - every sound and sample number exists, every bar plays something, levels stay sane.
 
 `test/reference.test.js` runs the same checks on the first version of Nachtschicht

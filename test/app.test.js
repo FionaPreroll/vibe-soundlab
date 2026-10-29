@@ -80,7 +80,7 @@ async function start(options = {}) {
 
 test('lists the repo tracks in order and selects the first', async () => {
   await start();
-  assert.deepEqual(names(), ['Nachtschicht', 'Nebelhorn', 'Glasregen', 'Polarlicht']);
+  assert.deepEqual(names(), ['Nachtschicht', 'Nebelhorn', 'Glasregen', 'Polarlicht', 'Druckwelle', 'Kernschmelze', 'Starkstrom']);
   assert.equal($('[data-role=title]').textContent, 'Nachtschicht');
   assert.match($('[data-role=details]').textContent, /Dark techstep · F minor · 174 BPM · 2:46/);
   assert.match($('[data-role=code]').textContent, /NACHTSCHICHT/);
@@ -127,7 +127,7 @@ test('picking a track while stopped only selects it', async () => {
 test('next and previous wrap around the list', async () => {
   await start();
   click($('[data-role=prev]'));
-  assert.equal($('[data-role=title]').textContent, 'Polarlicht');
+  assert.equal($('[data-role=title]').textContent, 'Starkstrom');
   click($('[data-role=next]'));
   click($('[data-role=next]'));
   assert.equal($('[data-role=title]').textContent, 'Nebelhorn');
@@ -181,7 +181,7 @@ test('uploads are added, selected, kept and removable', async () => {
   await settle();
   click($('.track.uploaded .remove'));
   assert.equal(engine.stops, 1);
-  assert.equal(names().length, 4);
+  assert.equal(names().length, 7);
   assert.equal($('[data-role=title]').textContent, 'Nachtschicht');
 });
 
