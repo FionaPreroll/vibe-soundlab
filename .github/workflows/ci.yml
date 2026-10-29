@@ -14,23 +14,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # installs the pnpm version pinned in package.json ("packageManager")
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      # unit, track and player tests, with minimum coverage for src/
-      - run: npm run coverage
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # unit, track and player tests, with minimum coverage for src/; writes lcov.info
+      - run: pnpm run coverage
+      # needs the CODECOV_TOKEN repository secret; a failed upload does not fail CI
+      - uses: codecov/codecov-action@v7
+        with:
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   browser:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
       # plays every track in headless Chromium and fails on any Strudel error
-      - run: npm run e2e
+      - run: pnpm run e2e

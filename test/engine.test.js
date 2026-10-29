@@ -33,7 +33,7 @@ function fakeStrudel({ failEval = null, noPattern = false, failInit = 0 } = {}) 
 
 test('the browser loads the same Strudel version the tests use', () => {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-  for (const name of ['@strudel/core', '@strudel/mini', '@strudel/tonal', '@strudel/transpiler']) assert.equal(pkg.devDependencies[name], STRUDEL_VERSION, name);
+  for (const name of ['@strudel/core', '@strudel/mini', '@strudel/tonal', '@strudel/transpiler', 'superdough']) assert.equal(pkg.devDependencies[name], STRUDEL_VERSION, name);
   assert.ok(STRUDEL_URL.includes(`@strudel/web@${STRUDEL_VERSION}/`));
 });
 
