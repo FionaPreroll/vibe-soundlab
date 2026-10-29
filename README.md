@@ -1,5 +1,8 @@
 # Vibe Soundlab
 
+> This is the `soundlab` branch: the sound design lessons, maintained on their own.
+> The `main` branch holds the Strudel track player, which is what GitHub Pages serves.
+
 Interactive, guided sound design lessons for modern drum & bass, in the browser.
 The first lesson builds a foghorn bass step by step: wavetable oscillator and unison,
 pitch drop, controlled overdrive, filter movement and a clean sub. A live spectrum

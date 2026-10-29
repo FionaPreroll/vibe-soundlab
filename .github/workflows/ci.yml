@@ -1,0 +1,22 @@
+# Soundlab branch: tests only. This branch is never deployed to GitHub Pages;
+# only `main` (the track player) publishes to gh-pages.
+name: CI (soundlab)
+
+on:
+  push:
+    branches: [soundlab]
+  pull_request:
+    branches: [soundlab]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
