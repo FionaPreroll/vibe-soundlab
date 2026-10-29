@@ -86,6 +86,7 @@ every event of the whole arrangement:
 - every orbit the kick ducks already plays before the first duck (otherwise Strudel reports
   "duck target orbit does not exist");
 - distortion types and vowels are ones Strudel knows;
+- only breaks that are exactly one bar long get stretched onto a bar with `fit()`;
 - every sound and sample number exists, every bar plays something, levels stay sane.
 
 `test/reference.test.js` runs the same checks on the first version of Nachtschicht

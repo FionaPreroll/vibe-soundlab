@@ -22,6 +22,9 @@ import { analyseTrack, trackFiles, TRACK_DIR } from './support/tracks.js';
 
 const banks = JSON.parse(readFileSync(new URL('./fixtures/sample-banks.json', import.meta.url), 'utf8'));
 const SYNTHS = new Set(['sine', 'triangle', 'square', 'sawtooth', 'supersaw', 'pulse', 'white', 'pink', 'brown', 'crackle']);
+// Breaks that fit() may stretch onto one bar. breaks165 is one bar long (1.42 s at
+// 165 BPM); breaks157 is 1.19 bars and stumbles when squeezed into one.
+const ONE_BAR_BREAKS = new Set(['breaks165']);
 const DISTORT_TYPES = new Set(Object.keys(distortionAlgorithms));
 const VOWELS = new Set(Object.keys(vowelFormant));
 const files = trackFiles();
@@ -87,6 +90,12 @@ for (const file of files) {
         if (v.vowel !== undefined && !VOWELS.has(v.vowel)) problems.add(`vowel ${v.vowel}`);
       }
       assert.deepEqual([...problems], []);
+    });
+
+    test('stretches only one-bar breaks onto a bar', async () => {
+      const { haps } = await analyseTrack(file);
+      const stretched = haps.filter((h) => h.value.unit === 'c' && String(h.value.s).startsWith('breaks'));
+      assert.deepEqual([...new Set(stretched.map((h) => h.value.s))].filter((name) => !ONE_BAR_BREAKS.has(name)), []);
     });
 
     test('keeps every value finite and every level sane', async () => {
