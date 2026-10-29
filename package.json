@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 8000",
-    "test": "node --test"
-  }
+    "test": "node --test",
+    "coverage": "node --test --experimental-test-coverage --test-coverage-include=\"js/**\" --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=lcov.info"
+  },
+  "packageManager": "pnpm@12.16.1"
 }
