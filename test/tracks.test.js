@@ -30,7 +30,7 @@ const VOWELS = new Set(Object.keys(vowelFormant));
 const files = trackFiles();
 
 test('there are several tracks', () => {
-  assert.ok(files.length >= 7, `found ${files.length}`);
+  assert.ok(files.length >= 10, `found ${files.length}`);
 });
 
 test('the distortion and vowel lists come from the audio engine', () => {

@@ -5,6 +5,10 @@ All notable changes to the player and its tracks. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Three Reese rollers with 808 booms: Tiefgarage, Schwerkraft and Unterströmung.
+
 ### Fixed
 
 - Starkstrom: the drum break in the second half no longer stumbles. It was a loop longer than one bar squeezed into one bar; it is now a clean one-bar break.

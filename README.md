@@ -3,7 +3,7 @@
 [![codecov](https://codecov.io/gh/FionaPreroll/vibe-soundlab/branch/main/graph/badge.svg)](https://codecov.io/gh/FionaPreroll/vibe-soundlab)
 
 Drum & bass written in [Strudel](https://strudel.cc/), and a browser player for it: four atmospheric
-tracks and three bangers.
+tracks, three bangers and three Reese rollers.
 Pick one of the tracks in this repo, or upload your own Strudel file and play it next to them.
 Play runs through the list: when a track reaches its last bar (`@bars`), the next one starts.
 The repeat button switches between off (stop after the last track), all (start over) and one
@@ -26,6 +26,9 @@ The live player: https://fionapreroll.github.io/vibe-soundlab/
 | [Druckwelle](tracks/druckwelle.js) | Dancefloor roller, overdriven foghorn bass, supersaw hook | G minor | 174 |
 | [Kernschmelze](tracks/kernschmelze.js) | Neurofunk, talking wavefolded bass, metal stabs, lasers | F# minor | 174 |
 | [Starkstrom](tracks/starkstrom.js) | Jump-up, bouncing wub bass with pitch bends, hoover, air horns | A minor | 175 |
+| [Tiefgarage](tracks/tiefgarage.js) | 808 roller, sliding 808 and subby Reese as one bass, dub stabs | Bb minor | 172 |
+| [Schwerkraft](tracks/schwerkraft.js) | Reese roller, huge beating Reese answering 808 booms | C# minor | 174 |
+| [Unterströmung](tracks/unterstroemung.js) | Steppy roller, 808 boom on every kick, Reese in the gaps, amens | G# minor | 175 |
 
 Every track is a plain Strudel file: paste it into strudel.cc, or use the player's
 "Open in strudel.cc" link, and it runs there too.
