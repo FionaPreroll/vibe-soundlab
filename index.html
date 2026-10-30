@@ -23,7 +23,7 @@
         </label>
       </section>
 
-      <section class="now" aria-live="polite">
+      <section class="now" aria-label="Now playing">
         <div class="now-head">
           <div>
             <h2 data-role="title">No track</h2>
@@ -37,7 +37,16 @@
           </div>
         </div>
         <p class="about" data-role="about"></p>
-        <p class="status"><span data-role="status"></span> <span class="progress" data-role="progress"></span></p>
+        <div class="seek">
+          <input type="range" class="seekbar" data-role="seek" min="0" max="1" step="1" value="0" aria-label="Position in bars" disabled />
+          <ol class="sections" data-role="sections" aria-label="Parts of the track"></ol>
+          <p class="clock">
+            <span data-role="time">0:00</span>
+            <span class="where"><span class="progress" data-role="progress"></span> <span class="section-name" data-role="section"></span></span>
+            <span data-role="length"></span>
+          </p>
+        </div>
+        <p class="status" aria-live="polite"><span data-role="status"></span></p>
         <details class="source">
           <summary>Code <a data-role="open" href="https://strudel.cc/" target="_blank" rel="noopener">Open in strudel.cc</a></summary>
           <pre><code data-role="code"></code></pre>

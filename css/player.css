@@ -81,6 +81,24 @@ a { color: var(--accent); }
 .ghost { background: none; color: var(--text); border: 1px solid var(--line); width: 36px; height: 36px; font-size: 1.2rem; line-height: 1; }
 .repeat { background: none; color: var(--muted); border: 1px solid var(--line); padding: 7px 14px; font-size: .9rem; }
 .repeat[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+/* Seek bar: the fill follows --fill, the parts of the track sit underneath. */
+.seek { margin-top: 16px; }
+.seekbar { --fill: 0%; width: 100%; margin: 0; height: 18px; background: transparent; cursor: pointer; appearance: none; -webkit-appearance: none; }
+.seekbar:disabled { cursor: default; opacity: .55; }
+.seekbar::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--accent) var(--fill), var(--line) var(--fill)); }
+.seekbar::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--accent) var(--fill), var(--line) var(--fill)); }
+.seekbar::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -4px; border-radius: 50%; background: var(--text); border: 0; }
+.seekbar::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--text); border: 0; }
+.seekbar:disabled::-webkit-slider-thumb { background: var(--muted); }
+.seekbar:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.sections { position: relative; list-style: none; margin: 6px 0 0; padding: 0; height: 26px; }
+.sections li { position: absolute; top: 0; bottom: 0; padding-right: 2px; }
+.sections .section { width: 100%; height: 100%; padding: 0 4px; border: 1px solid var(--line); border-radius: 4px; background: none; color: var(--muted); font: inherit; font-size: .72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.sections .section:hover { color: var(--text); border-color: var(--muted); }
+.sections .section.current { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+.clock { display: flex; justify-content: space-between; gap: 12px; margin: 6px 0 0; color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.clock .where { color: var(--text); }
+
 .status { min-height: 1.5em; color: var(--muted); margin: 10px 0 0; overflow-wrap: anywhere; }
 .status .error { color: var(--error); }
 .progress { font-variant-numeric: tabular-nums; }

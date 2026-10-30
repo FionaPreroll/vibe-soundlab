@@ -8,6 +8,8 @@ Pick one of the tracks in this repo, or upload your own Strudel file and play it
 Play runs through the list: when a track reaches its last bar (`@bars`), the next one starts.
 The repeat button switches between off (stop after the last track), all (start over) and one
 (repeat the current track). Uploads without a `@bars` header loop until you pick another track.
+The progress bar shows the parts of the track (intro, build, drops, …) as the final `arrange(...)`
+lists them; click or drag it, or click a part, to jump there.
 
 The live player: https://fionapreroll.github.io/vibe-soundlab/
 
@@ -35,7 +37,9 @@ Every track is a plain Strudel file: paste it into strudel.cc, or use the player
 
 ### Conventions the tests rely on
 
-Each track starts with a header the player reads:
+Each track starts with a header the player reads, and ends with one `arrange(...)` whose parts
+(`[16, intro]`, `[32, drop1]`, …) add up to `@bars`; the progress bar shows them by name.
+The header looks like this:
 
 ```js
 // @title Nachtschicht
@@ -110,6 +114,6 @@ every event of the whole arrangement:
 | --- | --- |
 | `tracks/` | the Strudel tracks and `index.json` |
 | `index.html`, `css/` | the player page |
-| `src/` | player code: engine (Strudel), library (repo tracks and uploads), playlist and repeat rules, upload checks, header parsing, strudel.cc links |
+| `src/` | player code: engine (Strudel, seeking), library (repo tracks and uploads), playlist and repeat rules, track parts for the progress bar, upload checks, header parsing, strudel.cc links |
 | `scripts/` | `index-tracks.js` (track index), `snapshot-samples.js` (sample names for the tests) |
 | `test/` | tests; `test/support/` runs Strudel in Node and holds the harmony checks |
