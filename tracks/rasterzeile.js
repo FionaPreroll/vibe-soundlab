@@ -110,6 +110,30 @@ const leadDrop = (line) => pwm(line).penv(12).pdecay(.035)
 // Ton rutscht aus zwei Halbtönen darunter hinein
 const leadSlide = (line) => pwm(line).penv(2).pattack(.06)
 
+// ---------- VISUALS (Hydra) ----------
+// Laufen im Player hinter dem Code und genauso auf strudel.cc.
+// H() macht aus einem Pattern eine Zahl, die Hydra in jedem Bild liest:
+// `energy` folgt den Teilen des Arrangements unten, `pulse` dem Beat.
+await initHydra()
+const energy = H(arrange(
+  [8,  saw.range(0, .4).slow(8)],    // intro: wird langsam heller
+  [16, ".6"],                        // verse
+  [16, "1"],                         // chorus
+  [8,  ".3"],                        // filter break
+  [16, ".6"],                        // verse
+  [16, "1"],                         // chorus
+  [8,  isaw.range(0, .5).slow(8)],   // outro: blendet aus
+))
+const pulse = H(isaw.fast(4))
+// Rasterzeile: Rasterbalken wie auf dem C64, die auf und ab wandern
+osc(16, .1, 2).rotate(Math.PI / 2)
+  .modulateScrollY(osc(1, .2).rotate(Math.PI / 2), .3)
+  .posterize(4, 1)
+  .pixelate(1, 120)
+  .mult(shape(2, .55, .25))
+  .brightness(() => -.35 + energy() * .1 + pulse() * energy() * .12)
+  .out()
+
 // ---------- ARRANGEMENT ----------
 // 4 Takte nur Stimme 3 (Bass, Kick, Snare), dann kommt der Arp dazu
 const intro = stack(
