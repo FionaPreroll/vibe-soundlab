@@ -29,6 +29,19 @@ test('o() is orbit()', () => {
   assert.equal(scope.o, core.orbit);
 });
 
+test('o() is orbit() where Strudel does not have it yet', () => {
+  class Pattern {
+    orbit(n) {
+      return `orbit ${n}`;
+    }
+  }
+  const older = { ...core, Pattern, orbit: () => 'orbit' };
+  const globals = {};
+  addStrudelCcExtras(older, globals);
+  assert.equal(new Pattern().o(2), 'orbit 2');
+  assert.equal(globals.o, older.orbit);
+});
+
 test('piano() plays the piano, held, panned by pitch', () => {
   const [low, high] = core.note(core.sequence('c2', 'c7')).piano().firstCycle().map((hap) => hap.value);
   assert.equal(low.s, 'piano');
@@ -64,6 +77,25 @@ test('what a song changes in Strudel is put back', () => {
   assert.equal('added' in Pattern.prototype, false);
   assert.equal(new Pattern().fixed, 'fixed');
   assert.deepEqual(globals, { n: 'note numbers', s: 'sounds', missing: undefined, other: 'left alone' });
+});
+
+test('what a song made permanent stays, and the rest is still put back', () => {
+  class Pattern {
+    keep() {
+      return 'built in';
+    }
+    fix() {
+      return 'built in';
+    }
+  }
+  const restore = rememberStrudel({ Pattern }, [], {});
+  Object.defineProperty(Pattern.prototype, 'fix', { value: () => 'for good', configurable: false, writable: false });
+  Object.defineProperty(Pattern.prototype, 'stuck', { value: () => 'added for good' });
+  Pattern.prototype.keep = () => 'replaced';
+  restore();
+  assert.equal(new Pattern().fix(), 'for good');
+  assert.equal(new Pattern().stuck(), 'added for good');
+  assert.equal(new Pattern().keep(), 'built in');
 });
 
 test('.sf2 soundfonts are not supported', () => {

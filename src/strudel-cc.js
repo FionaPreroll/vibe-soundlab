@@ -118,6 +118,14 @@ function keepPattern() {
   return this;
 }
 
+// A song can make a method permanent (not configurable). It then stays as the song left
+// it, rather than every later song failing.
+function quietly(change) {
+  try {
+    change();
+  } catch {}
+}
+
 /**
  * Remembers Strudel as it is now: its Pattern methods and the globals it put in `scope`
  * (`names`). Songs change both, e.g. register('as', …) replaces a built-in for every
@@ -129,14 +137,8 @@ export function rememberStrudel(strudel, names, scope = globalThis) {
   const methods = Object.getOwnPropertyDescriptors(proto);
   const globals = new Map(names.map((name) => [name, scope[name]]));
   return function restore() {
-    for (const key of Reflect.ownKeys(proto)) if (!Object.hasOwn(methods, key)) delete proto[key];
-    for (const key of Reflect.ownKeys(methods)) {
-      try {
-        Object.defineProperty(proto, key, methods[key]);
-      } catch {
-        // A built-in no song could change either.
-      }
-    }
+    for (const key of Reflect.ownKeys(proto)) if (!Object.hasOwn(methods, key)) quietly(() => delete proto[key]);
+    for (const key of Reflect.ownKeys(methods)) quietly(() => Object.defineProperty(proto, key, methods[key]));
     for (const [name, value] of globals) if (scope[name] !== value) scope[name] = value;
   };
 }
