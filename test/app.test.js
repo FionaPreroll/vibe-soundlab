@@ -54,6 +54,8 @@ function fakeEngine({ failInit = false } = {}) {
     position: () => engine.pos,
     mixer: () => null,
     isPlaying: () => engine.pos !== null,
+    locations: [],
+    activeLocations: () => engine.locations,
   };
   return engine;
 }
@@ -591,4 +593,41 @@ test('every animation frame redraws the mixer', async () => {
   app.drawFrame(1000);
   assert.equal(drawn.length, 10, 'nine strips and the EQ view');
   assert.equal(app.mixer.eqTarget(), 'master');
+});
+
+test('the code is highlighted and the sounding notes are marked', async () => {
+  dom.window.HTMLCanvasElement.prototype.getContext = () => null;
+  const { app, engine } = await start();
+  const code = $('[data-role=code]');
+  assert.equal(code.querySelector('.tok-keyword').textContent, 'const');
+  assert.ok(code.querySelectorAll('.tok-mini-word').length > 100);
+  const track = app.library.get('repo:nachtschicht').code;
+  const at = (text) => ({ start: track.indexOf(text), end: track.indexOf(text) + text.length });
+  engine.locations = [at('RolandJD990')];
+  app.drawFrame(0);
+  assert.equal(code.querySelectorAll('.playing').length, 0, 'nothing marked while stopped');
+
+  click($('[data-role=play]'));
+  await settle();
+  app.drawFrame(100);
+  assert.deepEqual([...code.querySelectorAll('.playing')].map((n) => n.textContent), ['RolandJD990']);
+  engine.locations = [];
+  app.drawFrame(110);
+  assert.equal(code.querySelectorAll('.playing').length, 1, 'at most 30 updates a second');
+  app.drawFrame(200);
+  assert.equal(code.querySelectorAll('.playing').length, 0);
+
+  engine.locations = [at('RolandJD990')];
+  code.closest('details').open = false;
+  app.drawFrame(300);
+  assert.equal(code.querySelectorAll('.playing').length, 0, 'no work while the code is hidden');
+  code.closest('details').open = true;
+
+  app.select('repo:nebelhorn');
+  await settle();
+  assert.match(code.textContent, /NEBELHORN/);
+  const before = code.firstChild;
+  app.updateProgress();
+  app.select('repo:nebelhorn');
+  assert.equal(code.firstChild, before, 'the same code is not rendered again');
 });

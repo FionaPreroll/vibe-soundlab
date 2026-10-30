@@ -2,6 +2,7 @@
 // fetch, storage) is passed in, so tests can drive it without a browser.
 import { loadCatalog } from './catalog.js';
 import { durationSeconds, formatDuration } from './header.js';
+import { renderCode } from './highlight.js';
 import { Library } from './library.js';
 import { createMixerPanel } from './mixer-panel.js';
 import { REPEAT_LABELS, hasEnded, nextRepeatMode, parseRepeatMode, trackAfter } from './playlist.js';
@@ -112,7 +113,7 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     title.textContent = track ? track.meta.title : 'No track';
     details.textContent = track ? describeTrack(track.meta) : '';
     about.textContent = track?.meta.about ?? (track?.source === 'upload' ? `Uploaded: ${track.file}` : '');
-    code.textContent = track ? track.code : '';
+    showCode(track);
     openLink.href = track ? strudelUrl(track.code) : 'https://strudel.cc/';
     const isPlaying = track !== null && state.playing === track.id;
     const isLoading = track !== null && state.loading === track.id;
@@ -124,6 +125,25 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     repeatButton.setAttribute('aria-pressed', String(state.repeat !== 'off'));
     renderSections(track);
     renderSeek();
+  }
+
+  // The code is highlighted once per track; while it plays, its sounding notes get marked.
+  let marker = null;
+  let shownCode = null;
+  function showCode(track) {
+    const text = track ? track.code : '';
+    if (text === shownCode) return;
+    shownCode = text;
+    marker = renderCode(code, text);
+  }
+
+  const codePanel = code.closest('details');
+  let lastMark = -Infinity;
+  function markPlaying(now) {
+    if (now - lastMark < 1000 / 30) return;
+    lastMark = now;
+    const live = state.playing !== null && state.playing === state.selected && state.loading === null;
+    marker.mark(live && codePanel?.open !== false ? engine.activeLocations() : []);
   }
 
   // The parts of the arrangement as buttons under the seek bar, sized by their length.
@@ -351,6 +371,7 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   /** Called every animation frame with its time in ms: draws the meters and the EQ. */
   function drawFrame(now) {
     mixer.draw(now);
+    markPlaying(now);
   }
 
   return { engine, library, state, mixer, select, play, stop, toggle, seekTo, addFiles, removeUpload, updateProgress, cycleRepeat, drawFrame };

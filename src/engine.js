@@ -33,6 +33,8 @@ export function createEngine({ load = () => import(STRUDEL_URL), createGraph = c
   let seekFloor = null;
   // Counts plays and stops, so a jump that was waiting for its fade can tell it is stale.
   let generation = 0;
+  // The pattern playing now, for marking its notes in the code.
+  let pattern = null;
 
   function init() {
     ready ??= (async () => {
@@ -98,11 +100,13 @@ export function createEngine({ load = () => import(STRUDEL_URL), createGraph = c
     if (playing) strudel.hush();
     generation++;
     graph?.fadeIn(0);
-    const pattern = await strudel.evaluate(code);
-    if (evalError || !pattern) {
+    const evaluated = await strudel.evaluate(code);
+    if (evalError || !evaluated) {
       playing = false;
+      pattern = null;
       throw evalError ?? new Error('The code did not produce a pattern.');
     }
+    pattern = evaluated;
     playing = true;
     seekFloor = null;
     if (from > 0) seek(from);
@@ -171,5 +175,23 @@ export function createEngine({ load = () => import(STRUDEL_URL), createGraph = c
     return now;
   }
 
-  return { init, play, stop, seek, position, isPlaying: () => playing, mixer: () => graph };
+  /**
+   * Where in the code the notes sounding right now were written, as { start, end }
+   * character ranges. Strudel records them for every mini-notation atom.
+   */
+  function activeLocations() {
+    const scheduler = repl?.scheduler;
+    if (!playing || !pattern?.queryArc || !scheduler) return [];
+    const t = scheduler.now();
+    try {
+      return pattern
+        .queryArc(t, t)
+        .filter((hap) => hap.whole && hap.whole.begin <= t && t < hap.whole.end)
+        .flatMap((hap) => hap.context?.locations ?? []);
+    } catch {
+      return [];
+    }
+  }
+
+  return { init, play, stop, seek, position, activeLocations, isPlaying: () => playing, mixer: () => graph };
 }
