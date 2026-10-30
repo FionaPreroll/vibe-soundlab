@@ -2,16 +2,22 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { SAMPLE_MAPS, STRUDEL_URL, STRUDEL_VERSION, createEngine } from '../src/engine.js';
+import { FakeAudioContext } from './support/fake-audio.js';
 
 // A stand-in for the @strudel/web module.
 function fakeStrudel({ failEval = null, noPattern = false, failInit = 0 } = {}) {
-  const calls = { samples: [], evaluate: [], hush: 0, resume: 0, init: 0, resets: 0, voices: [] };
+  const calls = { samples: [], evaluate: [], hush: 0, resume: 0, init: 0, resets: 0, voices: [], multiChannel: [], output: [] };
   let options;
+  const ctx = new FakeAudioContext();
+  ctx.currentTime = 3;
+  ctx.resume = async () => calls.resume++;
   // Only the parts of Strudel's Cyclist that seeking touches.
   const scheduler = { time: 12.5, lastEnd: 13, num_ticks_since_cps_change: 40, now: () => scheduler.time };
   const mod = {
     calls,
     scheduler,
+    ctx,
+    options: () => options,
     async initStrudel(opts) {
       calls.init++;
       if (calls.init <= failInit) throw new Error('offline');
@@ -20,7 +26,9 @@ function fakeStrudel({ failEval = null, noPattern = false, failInit = 0 } = {}) 
       return { scheduler };
     },
     samples: async (map) => calls.samples.push(map),
-    getAudioContext: () => ({ currentTime: 3, resume: async () => calls.resume++ }),
+    getAudioContext: () => ctx,
+    setMultiChannelOrbits: (on) => calls.multiChannel.push(on),
+    webaudioOutput: (...args) => calls.output.push(args),
     resetGlobalEffects: () => calls.resets++,
     superdough: async (value, t) => {
       calls.voices.push({ ...value, t });
@@ -124,7 +132,7 @@ test('a failed play does not block the next one', async () => {
 
 test('seek jumps to a bar and cuts what was still ringing', async () => {
   const strudel = fakeStrudel();
-  const engine = createEngine({ load: async () => strudel });
+  const engine = createEngine({ load: async () => strudel, createGraph: null });
   assert.equal(engine.seek(10), false, 'nothing to seek while stopped');
   await engine.play('s("bd")');
   assert.equal(engine.seek(40.7), true);
@@ -156,7 +164,7 @@ test('seek jumps to a bar and cuts what was still ringing', async () => {
 
 test('play can start from a later bar', async () => {
   const strudel = fakeStrudel();
-  const engine = createEngine({ load: async () => strudel });
+  const engine = createEngine({ load: async () => strudel, createGraph: null });
   await engine.play('s("bd")', { from: 24 });
   assert.equal(strudel.scheduler.lastEnd, 24);
   assert.equal(engine.position(), 24);
@@ -174,4 +182,78 @@ test('seek needs a scheduler it knows', async () => {
   const engine = createEngine({ load: async () => strudel });
   await engine.play('s("bd")');
   assert.equal(engine.seek(8), false);
+});
+
+test('the mixer sits between Strudel and the speakers', async () => {
+  const strudel = fakeStrudel();
+  const speakers = strudel.ctx.destination;
+  const engine = createEngine({ load: async () => strudel });
+  assert.equal(engine.mixer(), null, 'no mixer before the first play');
+  await engine.play('s("bd")');
+  const graph = engine.mixer();
+  assert.ok(graph);
+  assert.equal(strudel.ctx.destination, graph.input, 'Strudel now sends to the mixer');
+  assert.equal(strudel.calls.resets, 1, 'and rebuilds its output to pick that up');
+  const fade = strudel.ctx.nodes.find((n) => n.connections.some((c) => c.target === speakers));
+  assert.ok(fade, 'the mixer feeds the real speakers');
+  await engine.play('s("sd")');
+  assert.equal(engine.mixer(), graph, 'built once');
+
+  // Every note first switches Strudel to one channel pair per orbit.
+  strudel.options().defaultOutput('hap', 0.1, 0.2, 0.5, 4);
+  assert.deepEqual(strudel.calls.multiChannel, [true]);
+  assert.deepEqual(strudel.calls.output, [['hap', 0.1, 0.2, 0.5, 4]]);
+});
+
+test('without a mixer, Strudel plays straight to the speakers', async () => {
+  const strudel = fakeStrudel();
+  const engine = createEngine({ load: async () => strudel, createGraph: null });
+  await engine.play('s("bd")');
+  assert.equal(engine.mixer(), null);
+  assert.equal(strudel.options().defaultOutput, undefined);
+  assert.equal(strudel.calls.resets, 0);
+});
+
+test('a mixer that fails to build leaves playback working', async (t) => {
+  const warn = t.mock.method(console, 'warn', () => {});
+  const strudel = fakeStrudel();
+  const engine = createEngine({
+    load: async () => strudel,
+    createGraph: () => {
+      throw new Error('no ChannelSplitterNode');
+    },
+  });
+  await engine.play('s("bd")');
+  assert.equal(engine.isPlaying(), true);
+  assert.equal(engine.mixer(), null);
+  assert.match(warn.mock.calls[0].arguments.join(' '), /without the mixer: no ChannelSplitterNode/);
+  engine.seek(4);
+  assert.equal(strudel.scheduler.lastEnd, 4, 'jumps at once without a fade');
+  assert.deepEqual(strudel.calls.multiChannel, []);
+});
+
+test('with the mixer, a jump fades out first and back in after', async () => {
+  const strudel = fakeStrudel();
+  const waiting = [];
+  const engine = createEngine({ load: async () => strudel, later: (fn, ms) => waiting.push({ fn, ms }) });
+  await engine.play('s("bd")');
+  const fade = strudel.ctx.nodes.find((n) => n.connections.some((c) => c.target === strudel.ctx.speakers));
+  engine.seek(32);
+  assert.equal(fade.gain.value, 0, 'faded out');
+  assert.equal(strudel.scheduler.lastEnd, 13, 'the jump waits for the fade');
+  assert.equal(engine.position(), 32);
+  assert.equal(waiting[0].ms, 25);
+  waiting[0].fn();
+  assert.equal(strudel.scheduler.lastEnd, 32);
+  assert.equal(strudel.calls.resets, 2);
+  assert.deepEqual(strudel.calls.multiChannel, [true], 'the orbits it creates get their own channels');
+  assert.deepEqual(fade.gain.events.at(-1), ['target', 1, 3.15, 0.01]);
+
+  // A jump still waiting when playback stops is dropped.
+  engine.seek(64);
+  engine.stop();
+  waiting[1].fn();
+  assert.equal(strudel.scheduler.lastEnd, 32);
+  await engine.play('s("bd")');
+  assert.equal(fade.gain.value, 1, 'the next play is not left faded out');
 });

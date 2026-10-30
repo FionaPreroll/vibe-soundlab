@@ -69,7 +69,8 @@ a { color: var(--accent); }
 .drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.now { grid-area: now; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; min-width: 0; }
+.stage { grid-area: now; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.now, .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; min-width: 0; }
 .now-head { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
 .now h2 { margin: 0; font-size: 1.4rem; }
 .details { margin: 2px 0 0; color: var(--muted); }
@@ -103,11 +104,42 @@ a { color: var(--accent); }
 .status .error { color: var(--error); }
 .progress { font-variant-numeric: tabular-nums; }
 
-.source { margin-top: 14px; }
+.card-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.card-head h3 { margin: 0; font-size: 1rem; }
+.card-head .hint { margin: 0; color: var(--muted); font-size: .85rem; flex: 1; min-width: 12em; }
+.small { margin-left: auto; font: inherit; font-size: .85rem; color: var(--text); background: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.small:disabled { color: var(--muted); opacity: .5; cursor: default; }
+
+/* Mixer: one strip per orbit, then the master. Scrolls sideways on narrow screens. */
+.strips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.strip { --strip: var(--accent); flex: 1 0 62px; max-width: 92px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 4px; border-radius: 8px; background: color-mix(in srgb, var(--strip) 7%, transparent); border: 1px solid transparent; }
+.strip.master { border-color: var(--line); margin-left: 6px; }
+.strip.silent .viz, .strip.silent .fader { opacity: .45; }
+.strip .viz { width: 100%; height: 72px; display: block; }
+.fader, .band { writing-mode: vertical-lr; direction: rtl; width: 22px; height: 110px; margin: 0; accent-color: var(--strip); cursor: pointer; }
+.strip output, .eq-band output { font-size: .75rem; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 1.2em; }
+.ms { display: flex; gap: 4px; }
+.ms button { width: 24px; height: 22px; padding: 0; font: inherit; font-size: .72rem; font-weight: 700; border-radius: 4px; border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; }
+.ms .mute[aria-pressed="true"] { background: var(--error); border-color: var(--error); color: var(--accent-ink); }
+.ms .solo[aria-pressed="true"] { background: #eab308; border-color: #eab308; color: #1a1300; }
+.strip .name { width: 100%; padding: 2px 0; font: inherit; font-size: .78rem; font-weight: 600; color: var(--text); background: none; border: 0; border-bottom: 3px solid var(--strip); border-radius: 0; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.strip .name[aria-pressed="true"] { background: color-mix(in srgb, var(--strip) 22%, transparent); }
+
+/* EQ: response curve over the spectrum of the chosen channel, eight bands below. */
+.eq { --strip: var(--accent); }
+.eq-target { color: var(--muted); font-size: .9rem; }
+.eq-target select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; }
+.eq-view { width: 100%; height: 160px; display: block; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+.eq-bands { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-top: 10px; }
+.eq-band { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.eq-band .band { height: 96px; }
+.eq-band .freq { font-size: .75rem; color: var(--muted); }
+
 .source summary { cursor: pointer; color: var(--muted); }
 .source summary a { margin-left: 12px; }
 .source pre { margin: 10px 0 0; max-height: 60vh; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-size: 12.5px; line-height: 1.45; }
 
 @media (max-width: 720px) {
   .app { grid-template-columns: 1fr; grid-template-areas: "top" "now" "library"; }
+  .now, .card { padding: 14px; }
 }

@@ -3,6 +3,7 @@
 import { loadCatalog } from './catalog.js';
 import { durationSeconds, formatDuration } from './header.js';
 import { Library } from './library.js';
+import { createMixerPanel } from './mixer-panel.js';
 import { REPEAT_LABELS, hasEnded, nextRepeatMode, parseRepeatMode, trackAfter } from './playlist.js';
 import { parseSections, sectionAt } from './sections.js';
 import { strudelUrl } from './share.js';
@@ -65,6 +66,8 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   const sectionName = q('[data-role=section]');
   const timeNow = q('[data-role=time]');
   const timeTotal = q('[data-role=length]');
+
+  const mixer = createMixerPanel({ mixerRoot: q('[data-role=mixer]'), eqRoot: q('[data-role=eq]'), engine, storage });
 
   // Sections only change with the code, so each track's are read once.
   const sectionCache = new Map();
@@ -345,5 +348,10 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   state.selected = (wanted ?? library.list()[0])?.id ?? null;
   render();
 
-  return { library, state, select, play, stop, toggle, seekTo, addFiles, removeUpload, updateProgress, cycleRepeat };
+  /** Called every animation frame with its time in ms: draws the meters and the EQ. */
+  function drawFrame(now) {
+    mixer.draw(now);
+  }
+
+  return { engine, library, state, mixer, select, play, stop, toggle, seekTo, addFiles, removeUpload, updateProgress, cycleRepeat, drawFrame };
 }
