@@ -18,6 +18,11 @@ over that channel's live spectrum. Mixer and EQ settings stay in the browser.
 To get there, the player tells Strudel to give every orbit its own pair of output channels
 (multi-channel orbits) and splits them back up in its own Web Audio graph (`src/mixer-graph.js`).
 
+The code panel shows the track with syntax colours and, while it plays, outlines the
+mini-notation atoms (notes, sounds, numbers in `"..."` strings) that are sounding, the way the
+strudel.cc editor does. Strudel records where in the code each atom of a pattern was written;
+the player asks the playing pattern which notes are sounding and marks those places.
+
 The live player: https://fionapreroll.github.io/vibe-soundlab/
 
 > The sound design lessons (the foghorn lesson app) live on the
@@ -122,6 +127,6 @@ every event of the whole arrangement:
 | --- | --- |
 | `tracks/` | the Strudel tracks and `index.json` |
 | `index.html`, `css/` | the player page |
-| `src/` | player code: engine (Strudel, seeking), library (repo tracks and uploads), playlist and repeat rules, track parts for the progress bar, mixer (settings, audio graph, EQ math, meters, panel), upload checks, header parsing, strudel.cc links |
+| `src/` | player code: engine (Strudel, seeking), library (repo tracks and uploads), playlist and repeat rules, track parts for the progress bar, mixer (settings, audio graph, EQ math, meters, panel), code highlighting, upload checks, header parsing, strudel.cc links |
 | `scripts/` | `index-tracks.js` (track index), `snapshot-samples.js` (sample names for the tests) |
 | `test/` | tests; `test/support/` runs Strudel in Node and holds the harmony checks |
