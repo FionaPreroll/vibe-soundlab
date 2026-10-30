@@ -257,3 +257,36 @@ test('with the mixer, a jump fades out first and back in after', async () => {
   await engine.play('s("bd")');
   assert.equal(fade.gain.value, 1, 'the next play is not left faded out');
 });
+
+test('reports where in the code the sounding notes were written', async () => {
+  const strudel = fakeStrudel();
+  const hap = (begin, end, locations) => ({ whole: { begin, end }, context: { locations } });
+  let broken = false;
+  strudel.evaluate = async () => ({
+    queryArc: (from, to) => {
+      if (broken) throw new Error('bad pattern');
+      assert.equal(from, 12.5);
+      assert.equal(to, 12.5);
+      return [
+        hap(12, 13, [{ start: 1, end: 3 }]),
+        hap(12.5, 12.75, [{ start: 5, end: 6 }, { start: 8, end: 9 }]),
+        hap(11, 12.5, [{ start: 20, end: 21 }]),
+        { whole: undefined, context: { locations: [{ start: 30, end: 31 }] } },
+        hap(12, 14, undefined),
+        { whole: { begin: 12, end: 13 } },
+      ];
+    },
+  });
+  const engine = createEngine({ load: async () => strudel, createGraph: null });
+  assert.deepEqual(engine.activeLocations(), []);
+  await engine.play('note("c e g")');
+  assert.deepEqual(engine.activeLocations(), [
+    { start: 1, end: 3 },
+    { start: 5, end: 6 },
+    { start: 8, end: 9 },
+  ]);
+  broken = true;
+  assert.deepEqual(engine.activeLocations(), [], 'a pattern that fails to query marks nothing');
+  engine.stop();
+  assert.deepEqual(engine.activeLocations(), []);
+});

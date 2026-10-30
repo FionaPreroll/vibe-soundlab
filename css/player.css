@@ -8,6 +8,17 @@
   --accent-ink: #06121f;
   --error: #ff8a80;
   --radius: 10px;
+  /* code colours */
+  --code-keyword: #c792ea;
+  --code-call: #82aaff;
+  --code-def: #ffcb6b;
+  --code-mini: #c3e88d;
+  --code-number: #f78c6c;
+  --code-string: #addb67;
+  --code-comment: #6c7a8f;
+  --code-operator: #89ddff;
+  --code-punct: #8b98a9;
+  --code-mark: #ffe08a;
   color-scheme: dark;
 }
 
@@ -21,6 +32,16 @@
     --accent: #0b6bcb;
     --accent-ink: #ffffff;
     --error: #b3261e;
+    --code-keyword: #8e3fbf;
+    --code-call: #1f5fd1;
+    --code-def: #9a5b00;
+    --code-mini: #2b7a1d;
+    --code-number: #b4471b;
+    --code-string: #3f7d20;
+    --code-comment: #7d8796;
+    --code-operator: #0b7f9e;
+    --code-punct: #5a6677;
+    --code-mark: #c77700;
     color-scheme: light;
   }
 }
@@ -137,7 +158,21 @@ a { color: var(--accent); }
 
 .source summary { cursor: pointer; color: var(--muted); }
 .source summary a { margin-left: 12px; }
-.source pre { margin: 10px 0 0; max-height: 60vh; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-size: 12.5px; line-height: 1.45; }
+.source pre { margin: 10px 0 0; max-height: 60vh; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-size: 12.5px; line-height: 1.5; }
+
+/* Syntax colours; mini-notation strings (Strudel patterns) in green. */
+.tok-keyword { color: var(--code-keyword); }
+.tok-literal, .tok-number, .tok-mini-number { color: var(--code-number); }
+.tok-def { color: var(--code-def); }
+.tok-call, .tok-method { color: var(--code-call); }
+.tok-property, .tok-name { color: var(--text); }
+.tok-string { color: var(--code-string); }
+.tok-mini-quote, .tok-mini-word { color: var(--code-mini); }
+.tok-mini-op { color: var(--code-punct); }
+.tok-operator { color: var(--code-operator); }
+.tok-comment { color: var(--code-comment); font-style: italic; }
+/* The atoms that are sounding right now, like the strudel.cc editor marks them. */
+.source .playing { outline: 1.5px solid var(--code-mark); outline-offset: 0; border-radius: 2px; background: color-mix(in srgb, var(--code-mark) 22%, transparent); color: var(--text); }
 
 @media (max-width: 720px) {
   .app { grid-template-columns: 1fr; grid-template-areas: "top" "now" "library"; }

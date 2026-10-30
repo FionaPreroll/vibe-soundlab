@@ -120,6 +120,12 @@ try {
   if (!(muted?.[2] < 0.001 && muted?.[1] > 0.01)) problems.push(`mixer: muting the bass should silence only it, got ${JSON.stringify(muted)}`);
   await page.click('.strip[data-target="2"] .mute');
 
+  // Code: highlighted, with the sounding notes marked.
+  step = 'code marks';
+  const marks = await page.$$eval('[data-role=code] .playing', (nodes) => nodes.map((n) => n.textContent));
+  console.log(`marked in the code: ${marks.slice(0, 8).join(' ')}${marks.length > 8 ? ' …' : ''}`);
+  if (marks.length === 0) problems.push('code: no notes marked while playing');
+
   await jump(8);
 
   // Playlist: a two-bar upload at the end of the list, repeat all → Nachtschicht follows it.
