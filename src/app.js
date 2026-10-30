@@ -4,6 +4,7 @@ import { loadCatalog } from './catalog.js';
 import { durationSeconds, formatDuration } from './header.js';
 import { Library } from './library.js';
 import { REPEAT_LABELS, hasEnded, nextRepeatMode, parseRepeatMode, trackAfter } from './playlist.js';
+import { parseSections, sectionAt } from './sections.js';
 import { strudelUrl } from './share.js';
 import { readUpload } from './upload.js';
 
@@ -35,7 +36,16 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   } catch {
     // Blocked storage: start with repeat off.
   }
-  const state = { selected: null, playing: null, loading: null, status: '', error: false, repeat: parseRepeatMode(storedRepeat) };
+  const state = {
+    selected: null,
+    playing: null,
+    loading: null,
+    status: '',
+    error: false,
+    repeat: parseRepeatMode(storedRepeat),
+    // the bar the seek bar is being dragged to, or null
+    scrub: null,
+  };
 
   const q = (sel) => root.querySelector(sel);
   const list = q('[data-role=list]');
@@ -50,6 +60,18 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   const dropZone = q('[data-role=drop]');
   const progress = q('[data-role=progress]');
   const repeatButton = q('[data-role=repeat]');
+  const seekBar = q('[data-role=seek]');
+  const sectionList = q('[data-role=sections]');
+  const sectionName = q('[data-role=section]');
+  const timeNow = q('[data-role=time]');
+  const timeTotal = q('[data-role=length]');
+
+  // Sections only change with the code, so each track's are read once.
+  const sectionCache = new Map();
+  const sectionsOf = (track) => {
+    if (!sectionCache.has(track.code)) sectionCache.set(track.code, parseSections(track.code));
+    return sectionCache.get(track.code);
+  };
 
   function setStatus(text, error = false) {
     state.status = text;
@@ -97,6 +119,57 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     repeatButton.textContent = REPEAT_LABELS[state.repeat];
     repeatButton.dataset.mode = state.repeat;
     repeatButton.setAttribute('aria-pressed', String(state.repeat !== 'off'));
+    renderSections(track);
+    renderSeek();
+  }
+
+  // The parts of the arrangement as buttons under the seek bar, sized by their length.
+  function renderSections(track) {
+    const bars = track?.meta.bars;
+    const sections = track && bars ? sectionsOf(track).filter((s) => s.start < bars) : [];
+    sectionList.replaceChildren(
+      ...sections.map((section) => {
+        const length = Math.min(section.bars, bars - section.start);
+        const button = el(doc, 'button', { type: 'button', class: 'section', text: section.label, 'data-start': String(section.start) });
+        button.title = `${section.label}: bars ${section.start + 1}–${section.start + length}`;
+        button.addEventListener('click', () => seekTo(section.start));
+        const item = el(doc, 'li', {}, [button]);
+        item.style.left = `${(section.start / bars) * 100}%`;
+        item.style.width = `${(length / bars) * 100}%`;
+        return item;
+      }),
+    );
+    sectionList.hidden = sections.length === 0;
+  }
+
+  /** Bars → "m:ss" at the track's tempo, or '' when the tempo is unknown. */
+  const clockTime = (meta, bars) => (meta.bpm ? formatDuration((Math.max(0, bars) * 240) / meta.bpm) : '');
+
+  // Seek bar, clock and current part for the selected track at bar position `pos`.
+  function renderSeek(pos = engine.position()) {
+    const track = library.get(state.selected);
+    const bars = track?.meta.bars ?? null;
+    const live = track !== null && state.playing === track.id && state.loading === null && pos != null;
+    const at = state.scrub ?? (live ? Math.max(0, pos) : 0);
+    seekBar.max = String(bars ?? 1);
+    seekBar.disabled = !track || !bars || state.loading !== null;
+    if (state.scrub === null) seekBar.value = String(bars ? Math.min(Math.floor(at), bars) : 0);
+    seekBar.style.setProperty('--fill', `${bars ? Math.min(100, (at / bars) * 100) : 0}%`);
+    seekBar.setAttribute('aria-valuetext', bars ? `Bar ${Math.floor(at) + 1} of ${bars}` : 'Unknown length');
+    const meta = track?.meta ?? {};
+    timeNow.textContent = clockTime(meta, at) || (track ? '' : '0:00');
+    timeTotal.textContent = track ? formatDuration(durationSeconds(meta)) : '';
+    if (live || state.scrub !== null) {
+      const barNow = bars ? (Math.floor(at) % bars) + 1 : Math.floor(at) + 1;
+      progress.textContent = bars ? `Bar ${barNow} / ${bars}` : `Bar ${barNow}`;
+    } else {
+      progress.textContent = '';
+    }
+    const current = track ? sectionAt(sectionsOf(track), live || state.scrub !== null ? at : 0) : null;
+    sectionName.textContent = current && (live || state.scrub !== null) ? `· ${current.label}` : '';
+    for (const button of sectionList.querySelectorAll('.section')) {
+      button.classList.toggle('current', current !== null && Number(button.dataset.start) === current.start);
+    }
   }
 
   function render() {
@@ -118,7 +191,7 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   // after a newer one was made, its result is dropped.
   let request = 0;
 
-  async function play() {
+  async function play({ from = 0 } = {}) {
     const track = library.get(state.selected);
     if (!track || state.loading === track.id) return;
     const mine = ++request;
@@ -126,7 +199,7 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     setStatus(`Loading ${track.meta.title}…`);
     renderNow();
     try {
-      await engine.play(track.code);
+      await engine.play(track.code, { from });
       if (mine !== request) {
         // Stop was pressed while this track was loading: silence it again.
         if (state.loading === null && state.playing === null) engine.stop();
@@ -157,6 +230,21 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     return state.playing && state.playing === state.selected ? stop() : play();
   }
 
+  /**
+   * Jumps to a bar (0-based) of the selected track. While it plays, playback jumps
+   * there; otherwise it starts there.
+   */
+  function seekTo(bar) {
+    const track = library.get(state.selected);
+    const bars = track?.meta.bars;
+    state.scrub = null;
+    if (!track || !bars || state.loading !== null) return renderSeek();
+    const target = Math.min(Math.max(0, Math.floor(bar)), bars - 1);
+    if (state.playing !== track.id) return play({ from: target });
+    engine.seek(target);
+    return renderSeek();
+  }
+
   function removeUpload(id) {
     if (state.playing === id) stop();
     library.remove(id);
@@ -185,12 +273,12 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     renderNow();
   }
 
-  /** Called a few times a second: shows the bar and moves on when a track ends. */
+  /** Called a few times a second: shows the position and moves on when a track ends. */
   function updateProgress() {
     const track = library.get(state.playing);
     const pos = engine.position();
     if (!track || pos == null) {
-      progress.textContent = '';
+      renderSeek(pos);
       return;
     }
     if (state.loading === null && hasEnded(pos, track.meta.bars)) {
@@ -203,13 +291,17 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
       }
       return;
     }
-    const bars = track.meta.bars;
-    const barNow = bars ? (Math.floor(pos) % bars) + 1 : Math.floor(pos) + 1;
-    progress.textContent = bars ? `Bar ${barNow} / ${bars}` : `Bar ${barNow}`;
+    renderSeek(pos);
   }
 
   playButton.addEventListener('click', () => toggle());
   repeatButton.addEventListener('click', () => cycleRepeat());
+  // Dragging only previews the target; letting go (or a key press) jumps there.
+  seekBar.addEventListener('input', () => {
+    state.scrub = Number(seekBar.value);
+    renderSeek();
+  });
+  seekBar.addEventListener('change', () => seekTo(Number(seekBar.value)));
   q('[data-role=prev]').addEventListener('click', () => select(library.neighbour(state.selected, -1)?.id, { autoplay: state.playing !== null }));
   q('[data-role=next]').addEventListener('click', () => select(library.neighbour(state.selected, 1)?.id, { autoplay: state.playing !== null }));
   fileInput.addEventListener('change', async () => {
@@ -253,5 +345,5 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   state.selected = (wanted ?? library.list()[0])?.id ?? null;
   render();
 
-  return { library, state, select, play, stop, toggle, addFiles, removeUpload, updateProgress, cycleRepeat };
+  return { library, state, select, play, stop, toggle, seekTo, addFiles, removeUpload, updateProgress, cycleRepeat };
 }

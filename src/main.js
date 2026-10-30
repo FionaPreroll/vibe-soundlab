@@ -20,5 +20,5 @@ const app = await createApp({
   storage: safeStorage(),
   location: window.location,
 });
-setInterval(() => app.updateProgress(), 250);
+setInterval(() => app.updateProgress(), 100);
 window.vibePlayer = app;

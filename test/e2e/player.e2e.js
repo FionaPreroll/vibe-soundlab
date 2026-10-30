@@ -39,10 +39,12 @@ await page.route(`${cdnBase}**`, async (route) => {
   route.fulfill({ body: await readFile(file), contentType: 'text/javascript' });
 });
 const problems = [];
-page.on('pageerror', (err) => problems.push(`page error: ${err.message}`));
+// what the test is doing, so errors say when they happened
+let step = 'loading the page';
+page.on('pageerror', (err) => problems.push(`${step}: page error: ${err.message}`));
 page.on('console', (msg) => {
   const text = msg.text();
-  if (msg.type() === 'error' || /\[eval\] error|error:/i.test(text)) problems.push(`console: ${text}`);
+  if (msg.type() === 'error' || /\[eval\] error|error:/i.test(text)) problems.push(`${step}: console: ${text}`);
 });
 
 try {
@@ -51,6 +53,7 @@ try {
   const titles = await page.$$eval('.track .name', (nodes) => nodes.map((n) => n.textContent));
   console.log(`tracks: ${titles.join(', ')}`);
   for (let i = 0; i < titles.length; i++) {
+    step = `playing ${titles[i]}`;
     await page.click(`.track:nth-child(${i + 1}) .pick`);
     if ((await page.textContent('[data-role=play]')) === 'Play') await page.click('[data-role=play]');
     await page.waitForFunction(
@@ -73,7 +76,29 @@ try {
     if (!(bar >= 1 && bar <= expected)) problems.push(`${titles[i]}: expected to start from bar 1, now at ${progress}`);
   }
 
+  // Seek: jump into the first drop of the last track and keep playing from there.
+  const jump = async (bar) => {
+    step = `seeking to bar ${bar + 1}`;
+    await page.$eval(
+      '[data-role=seek]',
+      (input, value) => {
+        input.value = String(value);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      },
+      bar,
+    );
+    await page.waitForTimeout(2500);
+    const progress = await page.textContent('[data-role=progress]');
+    const at = Number(progress.match(/Bar (\d+)/)?.[1]);
+    console.log(`seek to bar ${bar + 1}: ${progress} ${await page.textContent('[data-role=section]')}`);
+    if (!(at >= bar + 1 && at <= bar + 5)) problems.push(`seek to bar ${bar + 1}: now at ${progress}`);
+  };
+  await jump(24);
+  await jump(8);
+
   // Playlist: a two-bar upload at the end of the list, repeat all → Nachtschicht follows it.
+  step = 'playlist';
   await page.setInputFiles('[data-role=file]', {
     name: 'short.js',
     mimeType: 'text/javascript',

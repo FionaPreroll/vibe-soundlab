@@ -26,16 +26,26 @@ function fakeEngine({ failInit = false } = {}) {
     init: async () => {
       if (failInit) throw new Error('CDN unreachable');
     },
-    async play(code) {
+    starts: [],
+    seeks: [],
+    async play(code, { from = 0 } = {}) {
       if (engine.failNext) {
         const err = engine.failNext;
         engine.failNext = null;
         throw err;
       }
       engine.played.push(code);
+      engine.starts.push(from);
+      engine.pos = from;
     },
     stop() {
       engine.stops++;
+      engine.pos = null;
+    },
+    seek(bar) {
+      engine.seeks.push(bar);
+      engine.pos = bar;
+      return true;
     },
     position: () => engine.pos,
   };
@@ -433,4 +443,129 @@ test('no auto-advance while the next track is still loading', async () => {
   app.updateProgress();
   app.updateProgress();
   assert.equal(engine.played.length, 2);
+});
+
+const seekBar = () => $('[data-role=seek]');
+const dragTo = (bar) => {
+  seekBar().value = String(bar);
+  seekBar().dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+};
+const release = () => seekBar().dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+const sectionButtons = () => $$('[data-role=sections] .section');
+
+test('the seek bar shows the parts and length of the selected track', async () => {
+  await start();
+  assert.equal(seekBar().max, '120');
+  assert.equal(seekBar().disabled, false);
+  assert.equal(seekBar().value, '0');
+  assert.deepEqual(
+    sectionButtons().map((b) => b.textContent),
+    ['Intro', 'Build', 'Drop 1', 'Breakdown', 'Build 2', 'Drop 2', 'Outro'],
+  );
+  const drop = sectionButtons()[2];
+  assert.equal(drop.parentElement.style.left, '20%');
+  assert.equal(drop.title, 'Drop 1: bars 25–56');
+  assert.equal($('[data-role=time]').textContent, '0:00');
+  assert.equal($('[data-role=length]').textContent, '2:46');
+  assert.equal($('[data-role=progress]').textContent, '');
+  assert.equal($('[data-role=section]').textContent, '');
+});
+
+test('the seek bar follows playback', async () => {
+  const { app, engine } = await start();
+  click($('[data-role=play]'));
+  await settle();
+  engine.pos = 30.5;
+  app.updateProgress();
+  assert.equal(seekBar().value, '30');
+  assert.equal(seekBar().style.getPropertyValue('--fill'), `${(30.5 / 120) * 100}%`);
+  assert.equal($('[data-role=time]').textContent, '0:42');
+  assert.equal($('[data-role=progress]').textContent, 'Bar 31 / 120');
+  assert.equal($('[data-role=section]').textContent, '· Drop 1');
+  assert.ok(sectionButtons()[2].classList.contains('current'));
+  assert.equal(seekBar().getAttribute('aria-valuetext'), 'Bar 31 of 120');
+  engine.pos = -0.1;
+  app.updateProgress();
+  assert.equal($('[data-role=progress]').textContent, 'Bar 1 / 120', 'never before the start');
+  click($('[data-role=play]'));
+  await settle();
+  app.updateProgress();
+  assert.equal(seekBar().value, '0');
+  assert.equal($('[data-role=progress]').textContent, '');
+});
+
+test('dragging previews the target, letting go jumps there', async () => {
+  const { app, engine } = await start();
+  click($('[data-role=play]'));
+  await settle();
+  engine.pos = 4;
+  dragTo(80);
+  assert.equal($('[data-role=progress]').textContent, 'Bar 81 / 120');
+  assert.equal($('[data-role=section]').textContent, '· Drop 2');
+  app.updateProgress();
+  assert.equal(seekBar().value, '80', 'playback does not pull the handle back while dragging');
+  assert.deepEqual(engine.seeks, []);
+  release();
+  assert.deepEqual(engine.seeks, [80]);
+  assert.equal(app.state.scrub, null);
+  assert.equal($('[data-role=progress]').textContent, 'Bar 81 / 120');
+  dragTo(120);
+  release();
+  assert.deepEqual(engine.seeks, [80, 119], 'the last bar at most');
+});
+
+test('seeking while stopped starts playback there', async () => {
+  const { engine } = await start();
+  dragTo(56);
+  release();
+  await settle();
+  assert.deepEqual(engine.starts, [56]);
+  assert.match($('[data-role=status]').textContent, /Playing Nachtschicht/);
+  assert.equal($('[data-role=progress]').textContent, 'Bar 57 / 120');
+  assert.equal($('[data-role=section]').textContent, '· Breakdown');
+});
+
+test('a part of the track can be clicked to jump to it', async () => {
+  const { engine } = await start();
+  click($('[data-role=play]'));
+  await settle();
+  click(sectionButtons()[5]);
+  assert.deepEqual(engine.seeks, [72]);
+  assert.ok(sectionButtons()[5].classList.contains('current'));
+});
+
+test('no seeking while a track loads or without a known length', async () => {
+  const engine = slowEngine();
+  engine.seek = (bar) => engine.seeks.push(bar);
+  engine.seeks = [];
+  const { app } = await start({ engine });
+  app.play();
+  assert.equal(seekBar().disabled, true);
+  app.seekTo(30);
+  assert.equal(engine.played.length, 1);
+  assert.deepEqual(engine.seeks, []);
+  engine.pending[0].resolve();
+  await settle();
+
+  await app.addFiles([fileLike('loop.js', '// @bpm 172\ns("bd")')]);
+  assert.equal(seekBar().disabled, true);
+  assert.equal($('[data-role=sections]').hidden, true);
+  assert.equal($('[data-role=length]').textContent, '');
+  app.seekTo(4);
+  assert.deepEqual(engine.seeks, []);
+});
+
+test('the clock is blank when the tempo is unknown', async () => {
+  const { app } = await start();
+  await app.addFiles([fileLike('short.js', '// @bars 8\narrange([4, a], [4, b])')]);
+  assert.equal(seekBar().max, '8');
+  assert.equal($('[data-role=time]').textContent, '');
+  assert.deepEqual(sectionButtons().map((b) => b.textContent), ['A', 'B']);
+});
+
+test('with nothing selected the clock rests at zero', async () => {
+  await start({ fetchFn: async () => response('', false, 500) });
+  assert.equal($('[data-role=time]').textContent, '0:00');
+  assert.equal(seekBar().disabled, true);
+  assert.equal(seekBar().getAttribute('aria-valuetext'), 'Unknown length');
 });

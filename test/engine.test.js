@@ -5,19 +5,27 @@ import { SAMPLE_MAPS, STRUDEL_URL, STRUDEL_VERSION, createEngine } from '../src/
 
 // A stand-in for the @strudel/web module.
 function fakeStrudel({ failEval = null, noPattern = false, failInit = 0 } = {}) {
-  const calls = { samples: [], evaluate: [], hush: 0, resume: 0, init: 0 };
+  const calls = { samples: [], evaluate: [], hush: 0, resume: 0, init: 0, resets: 0, voices: [] };
   let options;
+  // Only the parts of Strudel's Cyclist that seeking touches.
+  const scheduler = { time: 12.5, lastEnd: 13, num_ticks_since_cps_change: 40, now: () => scheduler.time };
   const mod = {
     calls,
+    scheduler,
     async initStrudel(opts) {
       calls.init++;
       if (calls.init <= failInit) throw new Error('offline');
       options = opts;
       await opts.prebake();
-      return { scheduler: { now: () => 12.5 } };
+      return { scheduler };
     },
     samples: async (map) => calls.samples.push(map),
-    getAudioContext: () => ({ resume: async () => calls.resume++ }),
+    getAudioContext: () => ({ currentTime: 3, resume: async () => calls.resume++ }),
+    resetGlobalEffects: () => calls.resets++,
+    superdough: async (value, t) => {
+      calls.voices.push({ ...value, t });
+      if (value.orbit === 2) throw new Error('voice failed');
+    },
     async evaluate(code) {
       calls.evaluate.push(code);
       if (failEval) {
@@ -112,4 +120,58 @@ test('a failed play does not block the next one', async () => {
   strudel.evaluate = async () => ({ pattern: true });
   await engine.play('good');
   assert.equal(engine.isPlaying(), true);
+});
+
+test('seek jumps to a bar and cuts what was still ringing', async () => {
+  const strudel = fakeStrudel();
+  const engine = createEngine({ load: async () => strudel });
+  assert.equal(engine.seek(10), false, 'nothing to seek while stopped');
+  await engine.play('s("bd")');
+  assert.equal(engine.seek(40.7), true);
+  assert.equal(strudel.scheduler.lastEnd, 40, 'whole bars only');
+  assert.equal(strudel.scheduler.num_ticks_since_cps_change, 0);
+  assert.equal(strudel.calls.resets, 1);
+  assert.deepEqual(
+    strudel.calls.voices.map((v) => v.orbit),
+    [1, 2, 3, 4, 5, 6, 7, 8],
+    'every orbit exists again before the first kick ducks one',
+  );
+  assert.ok(strudel.calls.voices.every((v) => v.gain === 0 && v.t > 3));
+
+  // The scheduler has not caught up yet: the position stays on the target bar.
+  assert.equal(engine.position(), 40);
+  strudel.scheduler.num_ticks_since_cps_change = 1;
+  strudel.scheduler.time = 39.95;
+  assert.equal(engine.position(), 40, 'latency puts the clock slightly behind at first');
+  strudel.scheduler.time = 40.2;
+  assert.equal(engine.position(), 40.2);
+  strudel.scheduler.time = 40.4;
+  assert.equal(engine.position(), 40.4);
+
+  engine.seek(-5);
+  assert.equal(strudel.scheduler.lastEnd, 0);
+  engine.stop();
+  assert.equal(engine.position(), null);
+});
+
+test('play can start from a later bar', async () => {
+  const strudel = fakeStrudel();
+  const engine = createEngine({ load: async () => strudel });
+  await engine.play('s("bd")', { from: 24 });
+  assert.equal(strudel.scheduler.lastEnd, 24);
+  assert.equal(engine.position(), 24);
+  await engine.play('s("sd")');
+  assert.equal(strudel.calls.resets, 1, 'from bar 1, nothing to jump');
+  assert.equal(engine.position(), 12.5);
+});
+
+test('seek needs a scheduler it knows', async () => {
+  const strudel = fakeStrudel();
+  strudel.initStrudel = async (opts) => {
+    await opts.prebake();
+    return { scheduler: { now: () => 1 } };
+  };
+  const engine = createEngine({ load: async () => strudel });
+  await engine.play('s("bd")');
+  assert.equal(engine.seek(8), false);
 });
