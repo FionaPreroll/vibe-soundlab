@@ -32,6 +32,8 @@ function fakeEngine({ failInit = false } = {}) {
     },
     starts: [],
     seeks: [],
+    // what play and update resolve to (see engine.play)
+    result: undefined,
     async play(code, { from = 0 } = {}) {
       if (engine.failNext) {
         const err = engine.failNext;
@@ -43,6 +45,7 @@ function fakeEngine({ failInit = false } = {}) {
       engine.pos = from;
       engine.code = code;
       engine.ver++;
+      return engine.result;
     },
     stop() {
       engine.stops++;
@@ -62,6 +65,7 @@ function fakeEngine({ failInit = false } = {}) {
       engine.updates.push(code);
       engine.code = code;
       engine.ver++;
+      return engine.result;
     },
     playingCode: () => engine.code,
     // the events the chords are found in
@@ -1141,6 +1145,37 @@ test('while a track plays, Update swaps the change in without starting it again'
   engine.locations = [at(changed, 'RolandJD990')];
   app.drawFrame(300);
   assert.deepEqual($$('[data-role=code] .playing').map((n) => n.textContent), ['RolandJD990']);
+});
+
+test('a song that plays without the samples of another site says which site and why', async () => {
+  const { engine } = await start();
+  const status = $('[data-role=status]');
+  engine.result = { skippedSamples: [{ site: 'tij.men', url: 'https://tij.men/strudel/strudel.json', reason: 'unreachable' }] };
+  click($('[data-role=play]'));
+  await settle();
+  assert.equal(
+    status.textContent,
+    'Playing Nachtschicht. Its samples from tij.men did not load (the site did not answer, or it does not let other web pages load its files). It plays on with the standard sounds, so some parts may sound different or be missing.',
+  );
+  assert.ok(status.classList.contains('warning'));
+  assert.equal(status.classList.contains('error'), false, 'it plays');
+  assert.equal($('[data-role=play]').textContent, 'Stop');
+  engine.result = { skippedSamples: [] };
+  typeCode('s("bd")');
+  pressKey({ key: 'Enter', ctrlKey: true });
+  await settle();
+  assert.equal(status.textContent, 'Playing Nachtschicht (updated)');
+  assert.equal(status.classList.contains('warning'), false);
+  engine.result = { skippedSamples: [{ site: 'shabda.ndre.gr', reason: 'status', status: 503 }] };
+  typeCode('samples("shabda:x")\ns("x")');
+  pressKey({ key: 'Enter', ctrlKey: true });
+  await settle();
+  assert.match(status.textContent, /^Playing Nachtschicht \(updated\)\. Its samples from shabda\.ndre\.gr did not load \(the site answered with error 503\)\./);
+  assert.ok(status.classList.contains('warning'));
+  click($('[data-role=play]'));
+  await settle();
+  assert.equal(status.textContent, 'Stopped');
+  assert.equal(status.classList.contains('warning'), false);
 });
 
 test('a change with an error keeps the music playing and shows where the error is', async () => {

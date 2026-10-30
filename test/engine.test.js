@@ -108,15 +108,63 @@ test('every song starts from Strudel as it was loaded', async () => {
   // what a song may do: replace a built-in, add a method, replace a global
   strudel.Pattern.prototype.piano = () => 'replaced';
   strudel.Pattern.prototype.mine = () => 'mine';
+  const samples = globalThis.samples;
   globalThis.samples = 'replaced';
   try {
     await engine.play('register("piano", …)');
     assert.equal(strudel.Pattern.prototype.piano, piano);
     assert.equal('mine' in strudel.Pattern.prototype, false);
-    assert.equal(globalThis.samples, undefined, 'as it was once Strudel had loaded');
+    assert.equal(globalThis.samples, samples, 'as it was once Strudel had loaded');
+    assert.equal(typeof samples, 'function');
   } finally {
     delete globalThis.samples;
   }
+});
+
+// A song that loads a sample list from another site first, as samples() at the top of
+// its code does on strudel.cc. Strudel's samples() fails for `failing` addresses and
+// never finishes for `hanging` ones.
+function sampleSong({ failing = [], hanging = [] } = {}) {
+  const strudel = fakeStrudel();
+  strudel.samples = async (map) => {
+    if (failing.includes(map)) throw new Error(`error loading "${map}"`);
+    if (hanging.includes(map)) await new Promise(() => {});
+    strudel.calls.samples.push(map);
+  };
+  const evaluate = strudel.evaluate;
+  strudel.evaluate = async (code) => {
+    const load = /^samples\('([^']+)'\)/.exec(code)?.[1];
+    if (load) await globalThis.samples(load);
+    return evaluate(code);
+  };
+  return strudel;
+}
+
+test("a song plays on without a sample list that doesn't load, and says so", async () => {
+  const url = 'https://tij.men/strudel/strudel.json';
+  const strudel = sampleSong({ failing: [url] });
+  const asked = [];
+  const fetchSamples = async (address) => {
+    asked.push(address);
+    throw new TypeError('Failed to fetch');
+  };
+  const engine = createEngine({ loadSoundfonts, load: async () => strudel, createGraph: null, fetchSamples });
+  const played = await engine.play(`samples('${url}')\ns("bd")`);
+  assert.deepEqual(played, { skippedSamples: [{ site: 'tij.men', url, reason: 'unreachable' }] });
+  assert.deepEqual(asked, [url], 'asked once more, to say why');
+  assert.equal(engine.isPlaying(), true);
+  assert.deepEqual(await engine.update(`samples('https://other.example/strudel.json')\ns("sd")`), { skippedSamples: [] }, 'a change that loads them all');
+  assert.ok(strudel.calls.samples.includes('https://other.example/strudel.json'));
+  assert.deepEqual((await engine.update(`samples('${url}')\ns("hh")`)).skippedSamples.map((s) => s.site), ['tij.men']);
+  assert.deepEqual(await engine.play('s("bd")'), { skippedSamples: [] }, 'each play reports its own');
+});
+
+test('a sample list that never arrives is given up on', async () => {
+  const strudel = sampleSong({ hanging: ['https://slow.example/strudel.json'] });
+  const engine = createEngine({ loadSoundfonts, load: async () => strudel, createGraph: null, samplesTimeout: 5 });
+  const played = await engine.play(`samples('https://slow.example/strudel.json')\ns("bd")`);
+  assert.deepEqual(played.skippedSamples, [{ site: 'slow.example', url: 'https://slow.example/strudel.json', reason: 'late', seconds: 0.005 }]);
+  assert.equal(engine.isPlaying(), true);
 });
 
 test('play evaluates the code, stop hushes it', async () => {

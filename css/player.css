@@ -7,6 +7,7 @@
   --accent: #7cc4ff;
   --accent-ink: #06121f;
   --error: #ff8a80;
+  --warning: #ffcb6b;
   --radius: 10px;
   /* code colours */
   --code-keyword: #c792ea;
@@ -32,6 +33,7 @@
     --accent: #0b6bcb;
     --accent-ink: #ffffff;
     --error: #b3261e;
+    --warning: #8a5300;
     --code-keyword: #8e3fbf;
     --code-call: #1f5fd1;
     --code-def: #9a5b00;
@@ -162,6 +164,7 @@ body:has(.visuals.on) .top { text-shadow: 0 1px 10px var(--bg); }
 
 .status { min-height: 1.5em; color: var(--muted); margin: 10px 0 0; overflow-wrap: anywhere; }
 .status .error { color: var(--error); }
+.status .warning { color: var(--warning); }
 .progress { font-variant-numeric: tabular-nums; }
 
 .card-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }

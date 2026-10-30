@@ -10,6 +10,7 @@ import { Library } from './library.js';
 import { channelNames } from './mixer.js';
 import { createMixerPanel } from './mixer-panel.js';
 import { REPEAT_LABELS, hasEnded, nextRepeatMode, parseRepeatMode, trackAfter } from './playlist.js';
+import { describeSkipped } from './samples.js';
 import { parseSections, sectionAt } from './sections.js';
 import { strudelUrl } from './share.js';
 import { SOURCES, loadSources, repoUrl } from './sources.js';
@@ -155,6 +156,14 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     state.error = error;
     status.textContent = text;
     status.classList.toggle('error', error);
+    status.classList.remove('warning');
+  }
+
+  // "Playing X", plus what the song plays without (sample sets from sites that failed).
+  function setPlaying(text, played) {
+    const missing = describeSkipped(played?.skippedSamples);
+    setStatus(missing ? `${text}. ${missing}` : text);
+    status.classList.toggle('warning', missing !== '');
   }
 
   function renderList() {
@@ -292,13 +301,13 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     if (state.playing !== track.id || !engine.update) return play();
     const text = editor.value();
     try {
-      await engine.update(text);
+      const played = await engine.update(text);
       if (state.playing !== track.id) return;
       // undone right away, because it failed as it started (see playbackError)
       if (engine.playingCode && engine.playingCode() !== text) return;
       state.playingCode = text;
       clearCodeError(track);
-      setStatus(`Playing ${track.meta.title} (updated)`);
+      setPlaying(`Playing ${track.meta.title} (updated)`, played);
     } catch (err) {
       if (state.playing !== track.id) return;
       setCodeError(track, err);
@@ -514,7 +523,7 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
       const code = codeFor(track) ?? (await codeOf(track));
       // Stopped, or another track picked, while the code came from GitHub.
       if (mine !== request) return;
-      await engine.play(code, { from });
+      const played = await engine.play(code, { from });
       if (mine !== request) {
         // Stop was pressed while this track was loading: silence it again.
         if (state.loading === null && state.playing === null) engine.stop();
@@ -523,7 +532,7 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
       state.playing = track.id;
       state.playingCode = code;
       clearCodeError(track);
-      setStatus(`Playing ${track.meta.title}`);
+      setPlaying(`Playing ${track.meta.title}`, played);
     } catch (err) {
       if (mine !== request) return;
       state.playing = null;

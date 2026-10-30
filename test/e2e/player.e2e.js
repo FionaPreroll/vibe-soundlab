@@ -270,22 +270,64 @@ try {
     const names = Object.keys(soundMap.get());
     return { gm: names.filter((n) => n.startsWith('gm_')).length, tr909: names.includes('tr909_bd'), zzfx: names.includes('z_sawtooth') };
   }, STRUDEL_URL);
-  const peak = await page.evaluate(async () => {
-    const analyser = window.vibePlayer.engine.mixer().analyser('master');
-    let max = 0;
-    for (let i = 0; i < 20; i++) {
-      const data = new Float32Array(analyser.fftSize);
-      analyser.getFloatTimeDomainData(data);
-      max = Math.max(max, ...data.map(Math.abs));
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    return max;
-  });
+  // Peak level on the master over one second.
+  const masterPeak = () =>
+    page.evaluate(async () => {
+      const analyser = window.vibePlayer.engine.mixer().analyser('master');
+      let max = 0;
+      for (let i = 0; i < 20; i++) {
+        const data = new Float32Array(analyser.fftSize);
+        analyser.getFloatTimeDomainData(data);
+        max = Math.max(max, ...data.map(Math.abs));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      return max;
+    });
+  const peak = await masterPeak();
   console.log(`songs from GitHub: ${listed} listed; ${song}: ${songStatus} · peak ${peak.toFixed(2)} · ${JSON.stringify(sounds)}`);
   if (listed < 100) problems.push(`songs from GitHub: only ${listed} listed`);
   if (!(peak > 0.01)) problems.push(`songs from GitHub: ${song} is silent`);
   if (!(sounds.gm > 100 && sounds.tr909 && sounds.zzfx)) problems.push(`songs from GitHub: strudel.cc sounds missing: ${JSON.stringify(sounds)}`);
   if (githubAsks.filter((u) => !u.endsWith('/sources/index.json')).length !== 1) problems.push(`songs from GitHub: expected one song loaded, got ${githubAsks.length - 1}`);
+  await page.click('[data-role=play]');
+
+  // A song whose samples come from a site that only lets strudel.cc load them (tzwaan's
+  // liquid loads its samples from another site): it plays with the standard sounds and says why.
+  step = 'samples from another site';
+  const tzwaan = sourceIndex.sources.find((source) => source.id === 'tzwaan');
+  const liquid = tzwaan.songs.find((s) => s.path === 'songs/liquid.js');
+  const elsewhereSong = `// "Made-up song with samples from elsewhere"
+samples('https://samples.example/strudel.json')
+setcpm(120 / 4)
+$: s("bd*2 sd").o(1)
+`;
+  await page.route(codeUrl(tzwaan, liquid.path), (route) => route.fulfill({ body: elsewhereSong, contentType: 'text/plain' }));
+  await page.route('https://samples.example/**', (route) =>
+    route.fulfill({ body: '{ "bd": "bd.wav" }', contentType: 'application/json', headers: { 'access-control-allow-origin': 'https://strudel.cc' } }),
+  );
+  await page.fill('[data-role=external-find]', liquid.title);
+  await page.locator('[data-role=external-list] .song[data-id^="ext:tzwaan"]:not([hidden]) .pick', { hasText: liquid.title }).first().click();
+  await page.waitForFunction(() => document.querySelector('[data-role=code]').textContent.includes('samples.example'));
+  // the browser and Strudel log the refused request
+  expectErrors = true;
+  await page.click('[data-role=play]');
+  await page.waitForFunction(
+    (title) => {
+      const status = document.querySelector('[data-role=status]').textContent;
+      return status.startsWith(`Playing ${title}`) || status.includes('Could not');
+    },
+    liquid.title,
+    { timeout: 60000 },
+  );
+  expectErrors = false;
+  const elsewhere = await page.textContent('[data-role=status]');
+  const elsewherePeak = await masterPeak();
+  console.log(`samples from another site: ${elsewhere} · peak ${elsewherePeak.toFixed(2)}`);
+  if (!elsewhere.startsWith(`Playing ${liquid.title}. Its samples from samples.example did not load (the site did not answer, or it does not let other web pages load its files).`)) {
+    problems.push(`samples from another site: ${elsewhere}`);
+  }
+  if (!(await page.$eval('[data-role=status]', (s) => s.classList.contains('warning')))) problems.push('samples from another site: not shown as a warning');
+  if (!(elsewherePeak > 0.01)) problems.push('samples from another site: the song is silent');
   await page.click('[data-role=play]');
 } finally {
   await browser.close();
