@@ -14,6 +14,7 @@ All notable changes to the player and its tracks. The format follows
 - Three chiptunes in the style of keygen and demoscene music, each limited to a few channels like the trackers of the time: Seriennummer (FastTracker keygen anthem, 6 channels), Rasterzeile (C64 SID, 3 voices) and Sternenfeld (Amiga intro, 4 channels).
 - Tracks can name their own mixer channels, so a track that plays an arpeggio where the others have a pad shows "Arpeggio" on that channel.
 - The track's code is now shown with syntax colours, and while a track plays, the notes and sounds you hear light up in it, like in the strudel.cc editor. The code panel is open from the start.
+- Every track now has its own visuals behind the player, made with Hydra: night-blue streaks for Nachtschicht, fog and a lighthouse for Nebelhorn, glass and rain for Glasregen, northern lights for Polarlicht, shock waves for Druckwelle, melting cells for Kernschmelze, electric arcs for Starkstrom, a car-park tunnel for Tiefgarage, a black hole for Schwerkraft, a river bed for Unterströmung, a pixel plasma for Seriennummer, C64 raster bars for Rasterzeile and a starfield for Sternenfeld. They grow with the build-ups, peak in the drops and choruses and pulse with the beat. The same code runs on strudel.cc. The "Visuals" button turns them off.
 
 ### Fixed
 

@@ -172,6 +172,29 @@ const preload = stack(
   s("bd:2 sd:11 hh:3 rd:3 cr:2").bank("RolandTR909"), s("sd:8").bank("EmuSP12"), s("breaks165"),
 ).gain(0)
 
+// ---------- VISUALS (Hydra) ----------
+// Laufen im Player hinter dem Code und genauso auf strudel.cc.
+// H() macht aus einem Pattern eine Zahl, die Hydra in jedem Bild liest:
+// `energy` folgt den Teilen des Arrangements unten, `pulse` dem Beat.
+await initHydra()
+const energy = H(arrange(
+  [16, saw.range(0, .3).slow(16)],   // intro: wird langsam heller
+  [8,  saw.range(.3, .8).slow(8)],   // build
+  [32, "1"],                         // drop 1
+  [8,  ".25"],                       // breakdown
+  [8,  saw.range(.3, .9).slow(8)],   // build 2
+  [32, "1"],                         // drop 2
+  [16, isaw.range(0, .6).slow(16)],  // outro: blendet aus
+))
+const pulse = H(isaw.fast(4))
+// Schwerkraft: ein schwarzes Loch, um das sich violettes Licht dreht
+osc(6, .05, 0).color(.6, .3, 1)
+  .modulateRotate(shape(99, .1, 1), () => 2 + energy() * 3)
+  .rotate(0, .1)
+  .mult(shape(99, .15, .5).invert())
+  .brightness(() => -.35 + pulse() * energy() * .15)
+  .out()
+
 // ---------- ARRANGEMENT ----------
 const intro = stack(
   preload.mask("<1 0!15>"),

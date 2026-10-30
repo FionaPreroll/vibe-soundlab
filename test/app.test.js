@@ -92,6 +92,7 @@ async function start(options = {}) {
     fetchFn: options.fetchFn ?? repoFetch,
     storage: options.storage ?? null,
     location: options.location ?? dom.window.location,
+    visuals: options.visuals ?? null,
   });
   return { app, engine };
 }
@@ -444,6 +445,45 @@ test('the mixer shows the channel names of the track that plays', async () => {
   app.stop();
   assert.deepEqual(channels(), ['Drums', 'Bass', 'Pad', 'Snare']);
   assert.equal(chip.meta.mixer, 'Noise, Bass, Arpeggio');
+});
+
+const visualsButton = () => $('[data-role=visuals-toggle]');
+const fakeVisuals = () => ({ enabled: [], setEnabled(on) { this.enabled.push(on); } });
+
+test('the visuals switch turns the Hydra visuals off and on and remembers it', async () => {
+  const storage = new MemoryStorage();
+  const visuals = fakeVisuals();
+  await start({ storage, visuals });
+  assert.equal(visualsButton().hidden, false);
+  assert.equal(visualsButton().textContent, 'Visuals on');
+  assert.deepEqual(visuals.enabled, [true]);
+  click(visualsButton());
+  assert.equal(visualsButton().textContent, 'Visuals off');
+  assert.equal(visualsButton().getAttribute('aria-pressed'), 'false');
+  assert.deepEqual(visuals.enabled, [true, false]);
+  assert.equal(storage.data['vibe-player:visuals'], 'off');
+  click(visualsButton());
+  assert.equal(visualsButton().getAttribute('aria-pressed'), 'true');
+  assert.equal(storage.data['vibe-player:visuals'], 'on');
+});
+
+test('visuals switched off stay off on the next visit', async () => {
+  const storage = new MemoryStorage();
+  storage.setItem('vibe-player:visuals', 'off');
+  const visuals = fakeVisuals();
+  await start({ storage, visuals });
+  assert.equal(visualsButton().textContent, 'Visuals off');
+  assert.deepEqual(visuals.enabled, [false]);
+});
+
+test('without visuals there is no switch, and blocked storage leaves them on', async () => {
+  await start();
+  assert.equal(visualsButton().hidden, true);
+  const storage = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } };
+  const { app } = await start({ storage, visuals: fakeVisuals() });
+  assert.equal(visualsButton().textContent, 'Visuals on');
+  app.toggleVisuals();
+  assert.equal(visualsButton().textContent, 'Visuals off');
 });
 
 test('uploads without a length keep looping', async () => {

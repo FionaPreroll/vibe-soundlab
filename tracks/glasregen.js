@@ -128,6 +128,29 @@ const preload = stack(
   n(run(16)).s("amencutup"), s("breaks165"), n(run(3)).s("glasstap"),
 ).gain(0)
 
+// ---------- VISUALS (Hydra) ----------
+// Laufen im Player hinter dem Code und genauso auf strudel.cc.
+// H() macht aus einem Pattern eine Zahl, die Hydra in jedem Bild liest:
+// `energy` folgt den Teilen des Arrangements unten, `pulse` dem Beat.
+await initHydra()
+const energy = H(arrange(
+  [16, saw.range(0, .3).slow(16)],   // intro: wird langsam heller
+  [8,  saw.range(.3, .8).slow(8)],   // build
+  [32, "1"],                         // drop 1
+  [16, ".25"],                       // breakdown
+  [8,  saw.range(.3, .9).slow(8)],   // build 2
+  [32, "1"],                         // drop 2
+  [16, isaw.range(0, .6).slow(16)],  // outro: blendet aus
+))
+const pulse = H(isaw.fast(4))
+// Glasregen: Scherben aus Glas, über die der Regen läuft
+voronoi(6, .25, .3)
+  .modulate(noise(3, .1), .15)
+  .color(.3, .7, 1).contrast(1.3)
+  .add(noise(8, 0).scale(1, .06, 1).thresh(.75, .1).scrollY(0, .5).color(.6, .9, 1), () => .1 + energy() * .25)
+  .brightness(() => -.35 + energy() * .1 + pulse() * energy() * .1)
+  .out()
+
 // ---------- ARRANGEMENT ----------
 const intro = stack(
   preload.mask("<1 0!15>"),

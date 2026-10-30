@@ -20,9 +20,10 @@ export const ORBITS = 8;
 
 /**
  * `createGraph` builds the mixer between Strudel and the speakers (null plays
- * without one); `later` runs a callback after a delay in ms.
+ * without one); `later` runs a callback after a delay in ms; `visuals` (see
+ * visuals.js) is told when a track's code runs, plays and stops.
  */
-export function createEngine({ load = () => import(STRUDEL_URL), createGraph = createMixerGraph, later = setTimeout } = {}) {
+export function createEngine({ load = () => import(STRUDEL_URL), createGraph = createMixerGraph, later = setTimeout, visuals = null } = {}) {
   let strudel = null;
   let repl = null;
   let ready = null;
@@ -100,20 +101,24 @@ export function createEngine({ load = () => import(STRUDEL_URL), createGraph = c
     if (playing) strudel.hush();
     generation++;
     graph?.fadeIn(0);
+    visuals?.beforeRun();
     const evaluated = await strudel.evaluate(code);
     if (evalError || !evaluated) {
       playing = false;
       pattern = null;
+      visuals?.stop();
       throw evalError ?? new Error('The code did not produce a pattern.');
     }
     pattern = evaluated;
     playing = true;
+    visuals?.afterRun();
     seekFloor = null;
     if (from > 0) seek(from);
   }
 
   function stop() {
     if (strudel) strudel.hush();
+    visuals?.stop();
     playing = false;
     seekFloor = null;
     generation++;

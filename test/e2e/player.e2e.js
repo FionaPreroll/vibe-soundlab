@@ -8,6 +8,7 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { STRUDEL_URL } from '../../src/engine.js';
+import { HYDRA_URL } from '../../src/visuals.js';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
@@ -38,6 +39,9 @@ await page.route(`${cdnBase}**`, async (route) => {
   const file = join(strudelDir, route.request().url().slice(cdnBase.length).split('?')[0]);
   route.fulfill({ body: await readFile(file), contentType: 'text/javascript' });
 });
+// Hydra the same way: its browser build from node_modules.
+const hydraFile = require.resolve('hydra-synth');
+await page.route(HYDRA_URL, async (route) => route.fulfill({ body: await readFile(hydraFile), contentType: 'text/javascript' }));
 const problems = [];
 // what the test is doing, so errors say when they happened
 let step = 'loading the page';
@@ -71,6 +75,8 @@ try {
     const progress = await page.textContent('[data-role=progress]');
     console.log(`${titles[i]}: ${status} · ${progress} · audio ${state}`);
     if (state !== 'running') problems.push(`${titles[i]}: audio context is ${state}`);
+    const visuals = await page.$eval('[data-role=visuals]', (canvas) => canvas.classList.contains('on'));
+    if (!visuals) problems.push(`${titles[i]}: the Hydra visuals did not start`);
     const bar = Number(progress.match(/Bar (\d+)/)?.[1]);
     const expected = Math.ceil((SECONDS_PER_TRACK * Number(status.match(/(\d+) BPM/)?.[1] ?? 174)) / 240) + 2;
     if (!(bar >= 1 && bar <= expected)) problems.push(`${titles[i]}: expected to start from bar 1, now at ${progress}`);
@@ -98,17 +104,24 @@ try {
 
   // Mixer: in the drop, drums and bass reach their own strips; muting the bass silences its strip.
   step = 'mixer';
+  // Peak level of each strip over one second: one analyser block is only 43 ms, and a
+  // sparse drum part can be quiet for that long.
   const levels = () =>
-    page.evaluate(() => {
+    page.evaluate(async () => {
       const graph = window.vibePlayer.engine.mixer();
       if (!graph) return null;
-      const peak = (target) => {
-        const analyser = graph.analyser(target);
-        const data = new Float32Array(analyser.fftSize);
-        analyser.getFloatTimeDomainData(data);
-        return Math.max(...data.map(Math.abs));
-      };
-      return Object.fromEntries(['master', 1, 2, 3].map((t) => [t, peak(t)]));
+      const targets = ['master', 1, 2, 3];
+      const peaks = Object.fromEntries(targets.map((t) => [t, 0]));
+      for (let i = 0; i < 20; i++) {
+        for (const target of targets) {
+          const analyser = graph.analyser(target);
+          const data = new Float32Array(analyser.fftSize);
+          analyser.getFloatTimeDomainData(data);
+          peaks[target] = Math.max(peaks[target], ...data.map(Math.abs));
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      return peaks;
     });
   const loud = await levels();
   console.log(`mixer peaks: ${JSON.stringify(loud)}`);
@@ -125,6 +138,15 @@ try {
   const marks = await page.$$eval('[data-role=code] .playing', (nodes) => nodes.map((n) => n.textContent));
   console.log(`marked in the code: ${marks.slice(0, 8).join(' ')}${marks.length > 8 ? ' …' : ''}`);
   if (marks.length === 0) problems.push('code: no notes marked while playing');
+
+  // Visuals: the switch hides them and brings them back.
+  step = 'visuals switch';
+  const visualsOn = () => page.$eval('[data-role=visuals]', (canvas) => canvas.classList.contains('on'));
+  await page.click('[data-role=visuals-toggle]');
+  if (await visualsOn()) problems.push('visuals: still shown after switching them off');
+  await page.click('[data-role=visuals-toggle]');
+  if (!(await visualsOn())) problems.push('visuals: not shown after switching them back on');
+  console.log('visuals: on for every track, the switch works');
 
   await jump(8);
 

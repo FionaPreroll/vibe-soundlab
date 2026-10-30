@@ -107,6 +107,28 @@ const beat = stack(kick, snare, hats).bank("RolandTR707").coarse(2)
 // im Breakdown spielt Kanal 1 das Echo der Melodie: drei Zeilen später, leiser
 const echo = (part) => part.late(3/16).gain(.26).lpf(2500).pan(LEFT).orbit(1)
 
+// ---------- VISUALS (Hydra) ----------
+// Laufen im Player hinter dem Code und genauso auf strudel.cc.
+// H() macht aus einem Pattern eine Zahl, die Hydra in jedem Bild liest:
+// `energy` folgt den Teilen des Arrangements unten, `pulse` dem Beat.
+await initHydra()
+const energy = H(arrange(
+  [8,  saw.range(0, .4).slow(8)],    // intro: wird langsam heller
+  [16, ".6"],                        // verse
+  [16, "1"],                         // chorus
+  [8,  ".3"],                        // breakdown
+  [16, ".6"],                        // verse
+  [8,  "1"],                         // chorus
+  [8,  isaw.range(0, .5).slow(8)],   // outro: blendet aus
+))
+const pulse = H(isaw.fast(4))
+// Sternenfeld: ein Flug durch die Sterne wie in einem Amiga-Intro
+const twinkle = () => .5 + pulse() * energy() * .5
+noise(150, .02).thresh(.82, 0)
+  .color(() => twinkle() * .8, () => twinkle() * .9, twinkle)
+  .add(src(o0).scale(1.04), () => .6 + energy() * .25)
+  .out()
+
 // ---------- ARRANGEMENT ----------
 const preload = s("bd sd hh").bank("RolandTR707").gain(0).orbit(1)
 

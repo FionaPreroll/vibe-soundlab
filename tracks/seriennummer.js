@@ -120,6 +120,31 @@ const roll = s("<[sd*16] [sd*32]>").bank("RolandTR909").n(6)
 const hats = s(`<[cr ~ ~ ~ hh hh oh hh hh hh oh hh hh hh oh hh] [[hh hh oh hh]*4]!7>`)
   .bank("RolandTR909").gain("[.25 .12 .17 .12]*4").hpf(4000).pan(.6).cut(4).orbit(4)
 
+// ---------- VISUALS (Hydra) ----------
+// Laufen im Player hinter dem Code und genauso auf strudel.cc.
+// H() macht aus einem Pattern eine Zahl, die Hydra in jedem Bild liest:
+// `energy` folgt den Teilen des Arrangements unten, `pulse` dem Beat.
+await initHydra()
+const energy = H(arrange(
+  [8,  saw.range(0, .4).slow(8)],    // intro: wird langsam heller
+  [16, ".6"],                        // verse
+  [16, "1"],                         // chorus
+  [8,  ".3"],                        // breakdown
+  [16, ".6"],                        // verse
+  [16, "1"],                         // chorus
+  [8,  isaw.range(0, .5).slow(8)],   // outro: blendet aus
+))
+const pulse = H(isaw.fast(4))
+// Seriennummer: Plasma wie im Fenster eines Keygens, grob gerastert
+const glow = () => .25 + energy() * .2 + pulse() * energy() * .1
+osc(6, .06, 1.3)
+  .modulate(osc(4, .04).rotate(1.2), .6)
+  .add(osc(9, .05, .7).rotate(-.8), .4)
+  .posterize(5, .7)
+  .pixelate(96, 64)
+  .color(glow, glow, glow)
+  .out()
+
 // ---------- ARRANGEMENT ----------
 // lädt die Samples vor dem ersten Einsatz (unhörbar)
 const preload = s("bd:0 sd:6 hh oh cr").bank("RolandTR909").gain(0).orbit(1)
