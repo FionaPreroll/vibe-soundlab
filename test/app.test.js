@@ -427,6 +427,20 @@ test('blocked storage does not break repeat', async () => {
   assert.equal(repeatButton().textContent, 'Repeat all');
 });
 
+test('the mixer shows the channel names of the track that plays', async () => {
+  const { app } = await start();
+  const channels = () => $$('.strip .name').map((n) => n.textContent).slice(0, 4);
+  assert.deepEqual(channels(), ['Drums', 'Bass', 'Pad', 'Snare']);
+  const [chip] = await app.addFiles([fileLike('chip.js', '// @mixer Noise, Bass, Arpeggio\ns("bd")')]);
+  assert.deepEqual(channels(), ['Noise', 'Bass', 'Arpeggio', 'Snare'], 'the selected track names them');
+  await app.play();
+  app.select('repo:nachtschicht');
+  assert.deepEqual(channels(), ['Noise', 'Bass', 'Arpeggio', 'Snare'], 'the playing track wins');
+  app.stop();
+  assert.deepEqual(channels(), ['Drums', 'Bass', 'Pad', 'Snare']);
+  assert.equal(chip.meta.mixer, 'Noise, Bass, Arpeggio');
+});
+
 test('uploads without a length keep looping', async () => {
   const { app, engine } = await start();
   await app.addFiles([fileLike('loop.js', 's("bd")')]);

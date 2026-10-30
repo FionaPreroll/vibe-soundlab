@@ -83,6 +83,22 @@ test('a strip for every orbit and the master, eight EQ bands', () => {
   assert.equal(strip('master').querySelector('.name').getAttribute('aria-pressed'), 'true', 'the EQ starts on the master');
 });
 
+test('the strips take the channel names of the track', () => {
+  const { panel } = start();
+  const names = { ...panel.names(), 3: 'Arpeggio', 4: 'Drums 2' };
+  panel.setNames(names);
+  assert.deepEqual($$('.strip .name').map((n) => n.textContent).slice(0, 5), ['Drums', 'Bass', 'Arpeggio', 'Drums 2', 'Stabs']);
+  assert.equal(strip(3).querySelector('.fader').getAttribute('aria-label'), 'Arpeggio volume');
+  assert.equal(strip(3).querySelector('.mute').title, 'Mute Arpeggio');
+  assert.equal(strip(3).querySelector('.solo').title, 'Solo Arpeggio');
+  assert.equal(strip(3).querySelector('.name').title, 'Show Arpeggio in the EQ');
+  assert.equal($('[data-role=eq-target] option[value="3"]').textContent, 'Arpeggio');
+  assert.equal($('[data-role=eq-target] option[value="master"]').textContent, 'Master');
+  strip(3).querySelector('.name').textContent = 'changed by hand';
+  panel.setNames({ ...names });
+  assert.equal(strip(3).querySelector('.name').textContent, 'changed by hand', 'the same names change nothing');
+});
+
 test('faders set the channel level and are remembered', () => {
   const { storage } = start({ graph: fakeGraph() });
   const fader = strip(2).querySelector('.fader');

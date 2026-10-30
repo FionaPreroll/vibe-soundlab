@@ -1,7 +1,7 @@
 // The mixer and EQ panels: builds their controls, keeps the settings (and
 // remembers them), passes them to the audio graph once it exists, and draws the
 // channel visualizers and the EQ view.
-import { EQ_BANDS, EQ_RANGE_DB, FADER_MAX_DB, FADER_MIN_DB, CHANNELS, STORAGE_KEY, channelGain, dbToGain, defaultMix, formatDb, isAudible, isDefaultMix, parseMix } from './mixer.js';
+import { EQ_BANDS, EQ_RANGE_DB, FADER_MAX_DB, FADER_MIN_DB, CHANNELS, STORAGE_KEY, channelGain, channelNames, dbToGain, defaultMix, formatDb, isAudible, isDefaultMix, parseMix } from './mixer.js';
 import { createMeter, drawChannel, drawEq, peakDb, spectrumBands } from './meters.js';
 
 // One colour per orbit; they read on both the dark and the light theme.
@@ -29,6 +29,7 @@ export function createMixerPanel({ mixerRoot, eqRoot, engine, storage = null }) 
   }
   let eqTarget = 'master';
   let graph = null;
+  let names = channelNames();
 
   const make = (tag, props = {}, children = []) => {
     const node = doc.createElement(tag);
@@ -42,7 +43,7 @@ export function createMixerPanel({ mixerRoot, eqRoot, engine, storage = null }) 
   };
 
   const settingsOf = (target) => (target === 'master' ? mix.master : mix.channels[target]);
-  const nameOf = (target) => (target === 'master' ? 'Master' : CHANNELS.find((c) => c.orbit === target).name);
+  const nameOf = (target) => (target === 'master' ? 'Master' : names[target]);
 
   // ---------- strips ----------
   const stripsEl = mixerRoot.querySelector('[data-role=strips]');
@@ -50,24 +51,16 @@ export function createMixerPanel({ mixerRoot, eqRoot, engine, storage = null }) 
   const strips = new Map();
 
   function buildStrip(target) {
-    const name = nameOf(target);
     const canvas = make('canvas', { class: 'viz', width: '56', height: '72', 'aria-hidden': 'true' });
-    const fader = make('input', {
-      type: 'range',
-      class: 'fader',
-      min: String(FADER_MIN_DB),
-      max: String(FADER_MAX_DB),
-      step: '0.5',
-      'aria-label': `${name} volume`,
-    });
+    const fader = make('input', { type: 'range', class: 'fader', min: String(FADER_MIN_DB), max: String(FADER_MAX_DB), step: '0.5' });
     const readout = make('output', { class: 'db' });
-    const label = make('button', { type: 'button', class: 'name', text: name, title: `Show ${name} in the EQ` });
+    const label = make('button', { type: 'button', class: 'name' });
     const strip = make('div', { class: 'strip', 'data-target': String(target) }, [canvas, fader, readout]);
     strip.style.setProperty('--strip', CHANNEL_COLORS[target]);
     const entry = { strip, canvas, fader, readout, label, meter: createMeter() };
     if (target !== 'master') {
-      const mute = make('button', { type: 'button', class: 'mute', text: 'M', title: `Mute ${name}` });
-      const solo = make('button', { type: 'button', class: 'solo', text: 'S', title: `Solo ${name}` });
+      const mute = make('button', { type: 'button', class: 'mute', text: 'M' });
+      const solo = make('button', { type: 'button', class: 'solo', text: 'S' });
       mute.addEventListener('click', () => update(() => (mix.channels[target].mute = !mix.channels[target].mute)));
       solo.addEventListener('click', () => update(() => (mix.channels[target].solo = !mix.channels[target].solo)));
       strip.append(make('div', { class: 'ms' }, [mute, solo]));
@@ -116,6 +109,28 @@ export function createMixerPanel({ mixerRoot, eqRoot, engine, storage = null }) 
   function setEqTarget(target) {
     eqTarget = target;
     render();
+  }
+
+  // Puts the channel names on the strips, their controls and the EQ menu.
+  function renderNames() {
+    for (const [target, entry] of strips) {
+      const name = nameOf(target);
+      entry.label.textContent = name;
+      entry.label.title = `Show ${name} in the EQ`;
+      entry.fader.setAttribute('aria-label', `${name} volume`);
+      if (target !== 'master') {
+        entry.mute.title = `Mute ${name}`;
+        entry.solo.title = `Solo ${name}`;
+      }
+    }
+    for (const option of targetSelect.options) option.textContent = nameOf(option.value === 'master' ? 'master' : Number(option.value));
+  }
+
+  /** Names the channels for the track at hand: { orbit: name }, see channelNames(). */
+  function setNames(next) {
+    if (CHANNELS.every(({ orbit }) => next[orbit] === names[orbit])) return;
+    names = { ...next };
+    renderNames();
   }
 
   // ---------- state ----------
@@ -221,6 +236,7 @@ export function createMixerPanel({ mixerRoot, eqRoot, engine, storage = null }) 
     }
   }
 
+  renderNames();
   render();
-  return { draw, settings: () => mix, setEqTarget, eqTarget: () => eqTarget };
+  return { draw, settings: () => mix, setEqTarget, eqTarget: () => eqTarget, setNames, names: () => names };
 }
