@@ -18,6 +18,14 @@ All notable changes to the player and its tracks. The format follows
 - Songs from GitHub: more than a hundred Strudel songs that eefano, tzwaan and MariaAreadne share in their GitHub repositories, from Cardiacs covers to Mario and Megalovania. They stay hidden until you switch them on, because playing one runs its code in the page. Each repository has its own foldable list with its folders, and you can search them by title, artist or folder. A song's code loads from GitHub when you pick it, always the version that was listed.
 - Songs written on strudel.cc now play here much as they do there: the General MIDI instruments (gm_piano, gm_flute, …), the ZZFX synths, the short drum machine names (tr909, linn, …), `piano()` and `o()`. Sliders keep the value they start with, and pianorolls and scopes are left out.
 - Uploads without a header take their title from a first comment like `// "Night Bus"`, as songs written for strudel.cc often have.
+- Guitar chords to play along with: while a track plays, the player shows the chord you hear now and the next ones, each with its fingering for standard tuning (E A D G B E). The chords are worked out from the notes that play, so they show for the tracks, your uploads and the songs from GitHub, wherever chords play. "Simple chords" turns Fm9 into Fm and G7 into G, which is easier to play.
+- The code can be changed while it plays: type in the code panel, then press Update or Ctrl+Enter (⌘+Enter on a Mac) and the change takes over without starting the track again. Ctrl+. stops. Your changes are kept for your next visit, marked as "edited", play when you press Play and open in strudel.cc as changed; "Undo my changes" brings back the track as it was.
+
+### Changed
+
+- Mistakes in the code no longer stop the music or freeze the page. A change with a syntax error is not played: the old version plays on, the line with the error is marked, and clicking the message puts the cursor there. Errors in mini-notation (a bracket left open in "c3 [e3") are found too.
+- Loops that never end are stopped after a second and a half, patterns with far more notes than can be played (`s("bd*100000")`, `fast(5000)`) are refused before they play or silenced as soon as they start, and code that is still running after 30 seconds is given up on. A change that fails like this while playing goes back to the version before it.
+- Mistakes in a track's visuals stop the visuals and say why; the music plays on.
 
 ### Fixed
 

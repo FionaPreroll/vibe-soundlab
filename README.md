@@ -24,6 +24,40 @@ mini-notation atoms (notes, sounds, numbers in `"..."` strings) that are soundin
 strudel.cc editor does. Strudel records where in the code each atom of a pattern was written;
 the player asks the playing pattern which notes are sounding and marks those places.
 
+The code can be changed while it plays: type in the code panel, then press Update or Ctrl+Enter
+(⌘+Enter) and the new code takes over without starting the track again, as on strudel.cc;
+Ctrl+. stops. Changes are kept in the browser per track (`vibe-player:drafts`), play when the
+track is played and open in strudel.cc as changed. The panel is a transparent `<textarea>` over the
+highlighted code, so colours and marks stay where the characters are (`src/editor.js`).
+
+Mistakes in the code can't take the page down (`src/guard.js`):
+
+- Before changed code runs, Strudel's transpiler reads all of it, mini-notation included. A syntax
+  error stops there: what played plays on and the line is marked. Mini-notation errors carry no
+  position, so the player tries each string with Strudel's mini parser to find the one that fails.
+- Every `for` and `while` loop gets a check in its condition (`__vibeLoop()`); it throws once the
+  page has been busy for 1.5 seconds without a break. Strudel marks notes by their position in the
+  code, so positions are mapped back to the code as written.
+- Strudel hands every new pattern to the player before it plays it (`editPattern`). The player asks
+  it for a tiny stretch first, then longer ones, and refuses patterns with far more notes than can be
+  played (more than 2000 a second); `s("bd*1000000000")` is found in milliseconds. While it plays, a
+  pattern that brings too many notes at once or takes too long to work out goes silent, and errors
+  are reported once instead of twenty times a second. A change that fails like this goes back to the
+  version before it; a track that does stops.
+- Code still running after 30 seconds is given up on, so one song can't block the next.
+- Hydra errors while drawing stop the visuals instead of repeating every frame.
+
+The guitar chords are worked out from the pattern that plays (`src/chords.js`): every half bar,
+a few bars ahead of the music, the player asks the pattern for its notes (drums, noise and silent
+notes don't count), weighs them by how long they sound (a held pad says more than a run of
+sixteenths, layers doubling a note count once) and picks the chord whose tones cover them best, with
+the lowest held note deciding between chords with the same notes (Am7 or C6). A chord that still
+covers the notes is kept, so names don't flicker. Roots are spelled from the `@key` header (F minor
+→ Db, Bb), else from how the notes are written (`ab3` → flats). `src/guitar.js` has a standard-tuning
+shape for every chord type in every key: the open chords first, else a movable shape with its root on
+the low E, A or D string, as low on the neck as fits; the tests check that every shape sounds its
+chord with the root at the bottom.
+
 Every track also brings its own [Hydra](https://hydra.ojack.xyz/) visuals, drawn full screen
 behind the player (the "Visuals" button in the top corner turns them off). Tracks start them the
 way they would on strudel.cc, so the same code runs in both places:
@@ -248,6 +282,6 @@ For the chiptunes (`test/support/tracker.js`, tried on small examples in `test/t
 | `tracks/` | the Strudel tracks and `index.json` |
 | `sources/` | `index.json`, the songs from other GitHub repositories (written by `pnpm run sources`) |
 | `index.html`, `css/` | the player page |
-| `src/` | player code: engine (Strudel, seeking), library (repo tracks, uploads, songs from GitHub), playlist and repeat rules, track parts for the progress bar, mixer (settings, audio graph, EQ math, meters, panel), code highlighting, Hydra visuals, upload checks, header parsing, strudel.cc links and extras, the GitHub sources |
+| `src/` | player code: engine (Strudel, seeking, changes while playing), guards against mistakes in the code, library (repo tracks, uploads, songs from GitHub), playlist and repeat rules, track parts for the progress bar, mixer (settings, audio graph, EQ math, meters, panel), code highlighting and editor, guitar chords and shapes, Hydra visuals, upload checks, header parsing, strudel.cc links and extras, the GitHub sources |
 | `scripts/` | `index-tracks.js` (track index), `index-sources.js` (songs from GitHub), `snapshot-samples.js` (sample names for the tests) |
 | `test/` | tests; `test/support/` runs Strudel in Node and holds the harmony and tracker checks |

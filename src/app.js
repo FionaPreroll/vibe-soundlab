@@ -1,8 +1,11 @@
 // Wires the player page together. Everything it touches (DOM root, engine,
 // fetch, storage) is passed in, so tests can drive it without a browser.
 import { loadCatalog } from './catalog.js';
+import { chordName, createChordTracker, spellingFor } from './chords.js';
+import { createEditor } from './editor.js';
+import { plainMessage } from './guard.js';
+import { chordDiagram, voicing } from './guitar.js';
 import { durationSeconds, formatDuration } from './header.js';
-import { renderCode } from './highlight.js';
 import { Library } from './library.js';
 import { channelNames } from './mixer.js';
 import { createMixerPanel } from './mixer-panel.js';
@@ -32,7 +35,13 @@ export function describeTrack(meta) {
 
 const isExternal = (track) => track?.source === 'external';
 
-export async function createApp({ root, engine, fetchFn, storage = null, location = null, visuals = null }) {
+/** An error as the player shows it: "Line 3: Unexpected token" (no "(3:11)" at the end). */
+export function describeError(err) {
+  const message = plainMessage(err);
+  return err?.location ? `Line ${err.location.line}: ${message}` : message;
+}
+
+export async function createApp({ root, engine, fetchFn, storage = null, location = null, visuals = null, clock = () => performance.now() }) {
   const doc = root.ownerDocument;
   const library = new Library({ storage });
   const REPEAT_KEY = 'vibe-player:repeat';
@@ -58,8 +67,28 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   } catch {
     // Blocked storage: off until switched on.
   }
+  // Code changed in the editor, per track, kept for the next visit.
+  const DRAFTS_KEY = 'vibe-player:drafts';
+  const drafts = new Map();
+  try {
+    for (const [id, code] of Object.entries(JSON.parse(storage?.getItem(DRAFTS_KEY) ?? '{}'))) if (typeof code === 'string') drafts.set(id, code);
+  } catch {
+    // Blocked storage or a broken entry: no drafts.
+  }
+  const CHORDS_KEY = 'vibe-player:chords';
+  let storedChords = null;
+  try {
+    storedChords = storage?.getItem(CHORDS_KEY) ?? null;
+  } catch {
+    // Blocked storage: full chords.
+  }
   const state = {
     external: storedExternal === 'on',
+    // the code that plays (the track's, or as changed in the editor)
+    playingCode: null,
+    // the last error in the selected track's code, as describeError shows it
+    codeError: null,
+    simpleChords: storedChords === 'simple',
     // the repositories from sources/index.json, once loaded
     sources: [],
     visuals: storedVisuals !== 'off',
@@ -98,14 +127,27 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   const externalList = q('[data-role=external-list]');
   const externalFind = q('[data-role=external-find]');
   const externalNone = q('[data-role=external-none]');
+  const applyButton = q('[data-role=apply]');
+  const revertButton = q('[data-role=revert]');
+  const editedBadge = q('[data-role=edited]');
+  const codeHint = q('[data-role=code-hint]');
+  const codeError = q('[data-role=code-error]');
+  const chordRow = q('[data-role=chord-row]');
+  const chordsNone = q('[data-role=chords-none]');
+  const chordsSimple = q('[data-role=chords-simple]');
 
   const mixer = createMixerPanel({ mixerRoot: q('[data-role=mixer]'), eqRoot: q('[data-role=eq]'), engine, storage });
 
-  // Sections only change with the code, so each track's are read once.
+  /** The code a track plays: as changed in the editor, else its own (null until loaded). */
+  const codeFor = (track) => (track ? (drafts.get(track.id) ?? track.code) : null);
+
+  // Sections only change with the code, so each version's are read once. While a track
+  // plays they come from the code that plays.
   const sectionCache = new Map();
   const sectionsOf = (track) => {
-    if (!sectionCache.has(track.code)) sectionCache.set(track.code, parseSections(track.code));
-    return sectionCache.get(track.code);
+    const text = (state.playing === track.id && state.playingCode) || codeFor(track) || '';
+    if (!sectionCache.has(text)) sectionCache.set(text, parseSections(text));
+    return sectionCache.get(text);
   };
 
   function setStatus(text, error = false) {
@@ -124,6 +166,7 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
         ]);
         pick.addEventListener('click', () => select(track.id, { autoplay: state.playing !== null }));
         const item = el(doc, 'li', { class: 'track', 'data-id': track.id }, [pick]);
+        item.classList.toggle('edited', drafts.has(track.id));
         if (track.source === 'upload') {
           item.classList.add('uploaded');
           const remove = el(doc, 'button', { class: 'remove', type: 'button', text: '×', title: `Remove ${track.meta.title}` });
@@ -150,7 +193,8 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
       origin.replaceChildren('From ', link, ' on GitHub');
     }
     showCode(track);
-    openLink.href = track?.code != null ? strudelUrl(track.code) : 'https://strudel.cc/';
+    const text = codeFor(track);
+    openLink.href = text != null ? strudelUrl(text) : 'https://strudel.cc/';
     const isPlaying = track !== null && state.playing === track.id;
     const isLoading = track !== null && state.loading === track.id;
     playButton.textContent = isLoading ? 'Loading…' : isPlaying ? 'Stop' : 'Play';
@@ -163,14 +207,114 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     renderSeek();
   }
 
-  // The code is highlighted once per track; while it plays, its sounding notes get marked.
-  let marker = null;
-  let shownCode = null;
+  // The code panel is an editor (editor.js). It shows the selected track's code as
+  // changed so far; while the track plays, Update swaps the changed code in.
+  const editor = createEditor({
+    input: q('[data-role=code-input]'),
+    layer: q('[data-role=code-layer]'),
+    code,
+    errorLine: q('[data-role=error-line]'),
+    onChange: (text) => edited(text),
+    onApply: () => apply(),
+    onStop: () => stop(),
+  });
+  let shownTrack = null;
+
   function showCode(track) {
-    const text = track?.code ?? '';
-    if (text === shownCode) return;
-    shownCode = text;
-    marker = renderCode(code, text);
+    if (track?.id !== shownTrack || codeFor(track) !== editor.value()) {
+      shownTrack = track?.id ?? null;
+      editor.setValue(codeFor(track) ?? '');
+      editor.showError(state.codeError?.track === shownTrack ? state.codeError.location : null);
+    }
+    editor.setReadOnly(!track || track.code === null);
+    renderCodeTools(track);
+  }
+
+  // The code differs from what plays (so its marks would land in the wrong places).
+  const isDirty = (track) => state.playing === track?.id && state.playingCode !== null && editor.value() !== state.playingCode;
+
+  function renderCodeTools(track = library.get(state.selected)) {
+    const playingThis = track !== null && state.playing === track.id && state.loading === null;
+    const dirty = isDirty(track);
+    applyButton.disabled = !playingThis || !dirty;
+    revertButton.hidden = !drafts.has(track?.id);
+    editedBadge.hidden = !drafts.has(track?.id);
+    codeHint.textContent = !track || track.code === null
+      ? ''
+      : dirty
+        ? 'Changed, not playing yet: press Update or Ctrl+Enter.'
+        : playingThis
+          ? 'Change the code while it plays, then press Update or Ctrl+Enter. Ctrl+. stops.'
+          : 'Change the code here; Play or Ctrl+Enter plays it as changed.';
+    const error = state.codeError?.track === track?.id ? state.codeError : null;
+    codeError.hidden = error === null;
+    codeError.textContent = error ? `${error.text}${error.location ? ' (show)' : ''}` : '';
+  }
+
+  function rememberDrafts() {
+    try {
+      storage?.setItem(DRAFTS_KEY, JSON.stringify(Object.fromEntries(drafts)));
+    } catch {
+      // Too big or blocked: kept for this visit.
+    }
+  }
+
+  function edited(text) {
+    const track = library.get(state.selected);
+    if (!track || track.code === null) return;
+    if (text === track.code) drafts.delete(track.id);
+    else drafts.set(track.id, text);
+    rememberDrafts();
+    if (state.codeError?.track === track.id) state.codeError = null;
+    openLink.href = strudelUrl(text);
+    renderCodeTools(track);
+    for (const item of list.children) if (item.dataset.id === track.id) item.classList.toggle('edited', drafts.has(track.id));
+  }
+
+  function setCodeError(track, err) {
+    state.codeError = { track: track.id, text: describeError(err), location: err?.location ?? null };
+    if (state.selected === track.id) editor.showError(state.codeError.location);
+  }
+
+  function clearCodeError(track) {
+    if (state.codeError?.track !== track.id) return;
+    state.codeError = null;
+    if (state.selected === track.id) editor.showError(null);
+  }
+
+  /**
+   * Ctrl+Enter or Update: while the selected track plays, its changed code takes over
+   * without starting again; otherwise the track plays as changed.
+   */
+  async function apply() {
+    const track = library.get(state.selected);
+    if (!track || track.code === null || state.loading !== null) return;
+    if (state.playing !== track.id || !engine.update) return play();
+    const text = editor.value();
+    try {
+      await engine.update(text);
+      if (state.playing !== track.id) return;
+      // undone right away, because it failed as it started (see playbackError)
+      if (engine.playingCode && engine.playingCode() !== text) return;
+      state.playingCode = text;
+      clearCodeError(track);
+      setStatus(`Playing ${track.meta.title} (updated)`);
+    } catch (err) {
+      if (state.playing !== track.id) return;
+      setCodeError(track, err);
+      setStatus(`Not updated, ${track.meta.title} plays on as before. ${describeError(err)}`, true);
+    }
+    renderNow();
+  }
+
+  function revert() {
+    const track = library.get(state.selected);
+    if (!track || !drafts.has(track.id)) return null;
+    drafts.delete(track.id);
+    rememberDrafts();
+    clearCodeError(track);
+    render();
+    return state.playing === track.id ? apply() : null;
   }
 
   const codePanel = code.closest('details');
@@ -178,8 +322,76 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   function markPlaying(now) {
     if (now - lastMark < 1000 / 30) return;
     lastMark = now;
-    const live = state.playing !== null && state.playing === state.selected && state.loading === null;
-    marker.mark(live && codePanel?.open !== false ? engine.activeLocations() : []);
+    const track = library.get(state.selected);
+    const live = state.playing !== null && state.playing === state.selected && state.loading === null && !isDirty(track);
+    editor.mark(live && codePanel?.open !== false ? engine.activeLocations() : []);
+  }
+
+  // Guitar chords of what plays (chords.js finds them, guitar.js draws the shapes).
+  const chords = createChordTracker({ query: (begin, end) => engine.query?.(begin, end) ?? [], clock });
+  let chordsOf = null;
+  let chordsShown = null;
+  let lastChords = -Infinity;
+  const diagrams = new Map();
+
+  function diagramFor(chord, name) {
+    if (!diagrams.has(name)) diagrams.set(name, chordDiagram(doc, voicing(chord), name));
+    return diagrams.get(name).cloneNode(true);
+  }
+
+  // "Bar 17", or "Bar 17 · beat 3" for a chord that comes in the middle of the bar.
+  const barLabel = (start) => `Bar ${Math.floor(start) + 1}${Number.isInteger(start) ? '' : ` · beat ${Math.round((start % 1) * 4) + 1}`}`;
+
+  function renderChords(now) {
+    if (now - lastChords < 1000 / 10) return;
+    lastChords = now;
+    const track = library.get(state.playing);
+    const pos = track && state.loading === null ? engine.position() : null;
+    const version = engine.version?.() ?? 0;
+    if (chordsOf !== `${track?.id}|${version}`) {
+      chordsOf = `${track?.id}|${version}`;
+      chords.reset();
+    }
+    let changes = [];
+    let note = 'The chords show up here while a track plays.';
+    if (pos != null) {
+      chords.fill(pos, 8, 4);
+      changes = chords.upcoming(pos, 4, { simple: state.simpleChords });
+      if (chords.isSlow()) note = 'This song is too heavy to look ahead in, so there are no chords for it.';
+      else if (changes.length === 0) note = 'Listening for chords…';
+      else if (changes.every((change) => change.chord === null)) note = 'No chords here: only drums, noise or single notes play.';
+    }
+    const spelling = spellingFor({ key: track?.meta.key, spelled: chords.spelled() });
+    const named = changes.map((change) => ({ ...change, name: chordName(change.chord, spelling) }));
+    const view = `${note}|${state.simpleChords}|${named.map((c) => `${c.start}:${c.name}`).join(',')}`;
+    if (view === chordsShown) return;
+    chordsShown = view;
+    const shown = named.length > 0 && !named.every((change) => change.chord === null);
+    chordRow.hidden = !shown;
+    chordsNone.hidden = shown;
+    chordsNone.textContent = note;
+    chordRow.replaceChildren(
+      ...(shown ? named : []).map((change, i) => {
+        const item = el(doc, 'li', { class: i === 0 ? 'chord now' : 'chord' }, [
+          el(doc, 'span', { class: 'when', text: i === 0 ? 'Now' : barLabel(change.start) }),
+          el(doc, 'span', { class: 'chord-name', text: change.name || '–' }),
+        ]);
+        // every chord the tracker names has a shape (see the guitar tests)
+        item.append(change.chord ? diagramFor(change.chord, change.name) : el(doc, 'span', { class: 'no-chord', text: 'No chord' }));
+        return item;
+      }),
+    );
+  }
+
+  function toggleSimpleChords() {
+    state.simpleChords = !state.simpleChords;
+    try {
+      storage?.setItem(CHORDS_KEY, state.simpleChords ? 'simple' : 'full');
+    } catch {
+      // Not remembered, but switched for this visit.
+    }
+    chordsSimple.setAttribute('aria-pressed', String(state.simpleChords));
+    lastChords = -Infinity;
   }
 
   // The parts of the arrangement as buttons under the seek bar, sized by their length.
@@ -299,7 +511,7 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     setStatus(`Loading ${track.meta.title}…`);
     renderNow();
     try {
-      const code = track.code ?? (await codeOf(track));
+      const code = codeFor(track) ?? (await codeOf(track));
       // Stopped, or another track picked, while the code came from GitHub.
       if (mine !== request) return;
       await engine.play(code, { from });
@@ -309,11 +521,15 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
         return;
       }
       state.playing = track.id;
+      state.playingCode = code;
+      clearCodeError(track);
       setStatus(`Playing ${track.meta.title}`);
     } catch (err) {
       if (mine !== request) return;
       state.playing = null;
-      setStatus(`Could not play ${track.meta.title}: ${err?.message ?? err}`, true);
+      state.playingCode = null;
+      setCodeError(track, err);
+      setStatus(`Could not play ${track.meta.title}: ${describeError(err)}`, true);
     } finally {
       if (state.loading === track.id && mine === request) state.loading = null;
     }
@@ -325,8 +541,39 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     state.loading = null;
     engine.stop();
     state.playing = null;
+    state.playingCode = null;
     setStatus('Stopped');
     render();
+  }
+
+  /**
+   * The engine reports an error from a track that plays (see engine.js): it stopped,
+   * a change that failed while playing was undone, or a stretch of it went silent.
+   */
+  function playbackError(err, { stopped = false, reverted = false, code: before = null } = {}) {
+    const track = library.get(state.loading ?? state.playing);
+    if (!track) return;
+    if (stopped) {
+      request++;
+      state.loading = null;
+      state.playing = null;
+      state.playingCode = null;
+      setCodeError(track, err);
+      setStatus(`Stopped ${track.meta.title}: ${describeError(err)}`, true);
+    } else if (reverted) {
+      state.playingCode = before;
+      setCodeError(track, err);
+      setStatus(`Your change failed while playing, so the version before it plays again. ${describeError(err)}`, true);
+    } else {
+      setStatus(`Error while playing ${track.meta.title}: ${describeError(err)}`, true);
+    }
+    render();
+  }
+
+  /** The visuals stopped because of an error in their code (see visuals.js). */
+  function visualsError(err) {
+    const track = library.get(state.playing);
+    setStatus(`The visuals stopped${track ? ` in ${track.meta.title}` : ''}: ${describeError(err)}`, true);
   }
 
   function toggle() {
@@ -350,6 +597,7 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
 
   function removeUpload(id) {
     if (state.playing === id) stop();
+    if (drafts.delete(id)) rememberDrafts();
     library.remove(id);
     if (state.selected === id) state.selected = library.list()[0]?.id ?? null;
     render();
@@ -548,6 +796,13 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   q('[data-role=external-off]').addEventListener('click', () => hideExternal());
   externalFind.addEventListener('input', () => findExternal());
   playButton.addEventListener('click', () => toggle());
+  applyButton.addEventListener('click', () => apply());
+  revertButton.addEventListener('click', () => revert());
+  codeError.addEventListener('click', () => {
+    if (state.codeError?.location) editor.focusAt(state.codeError.location.position);
+  });
+  chordsSimple.addEventListener('click', () => toggleSimpleChords());
+  chordsSimple.setAttribute('aria-pressed', String(state.simpleChords));
   repeatButton.addEventListener('click', () => cycleRepeat());
   visualsButton.addEventListener('click', () => toggleVisuals());
   renderVisuals();
@@ -606,10 +861,11 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   render();
   if (first?.code === null) preload(first);
 
-  /** Called every animation frame with its time in ms: draws the meters and the EQ. */
+  /** Called every animation frame with its time in ms: meters, EQ, code marks and chords. */
   function drawFrame(now) {
     mixer.draw(now);
     markPlaying(now);
+    renderChords(now);
   }
 
   return {
@@ -622,6 +878,11 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     stop,
     toggle,
     seekTo,
+    apply,
+    revert,
+    playbackError,
+    visualsError,
+    toggleSimpleChords,
     addFiles,
     removeUpload,
     updateProgress,

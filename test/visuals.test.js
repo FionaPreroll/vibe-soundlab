@@ -215,3 +215,49 @@ test('the stand-in accepts any chain and counts as zero', () => {
   assert.equal(typeof chain, 'function');
   assert.equal(+hydra.speed, 0);
 });
+
+test('code changed while a track plays keeps the visuals until the new code replaces them', async () => {
+  const visuals = createVisuals({ canvas, load });
+  await playTrackWithVisuals(visuals);
+  const [hydra] = FakeHydra.made;
+  visuals.beforeRun({ fresh: false });
+  assert.equal(hydra.hushes, 0, 'still drawing while the new code runs');
+  await visuals.initHydra();
+  visuals.afterRun();
+  assert.equal(hydra.hushes, 0);
+  assert.equal(visuals.isShowing(), true);
+  // the new code has no visuals any more
+  visuals.beforeRun({ fresh: false });
+  visuals.afterRun();
+  assert.equal(hydra.hushes, 1);
+  assert.equal(visuals.isShowing(), false);
+});
+
+test('changed code that fails leaves the visuals as they were', async () => {
+  const visuals = createVisuals({ canvas, load });
+  await playTrackWithVisuals(visuals);
+  visuals.beforeRun({ fresh: false });
+  visuals.failedRun();
+  assert.equal(visuals.isShowing(), true);
+});
+
+test('visuals that throw while drawing stop, and the error is reported once', async () => {
+  const errors = [];
+  class BrokenHydra extends FakeHydra {
+    tick() {
+      throw new Error('energyy is not defined');
+    }
+  }
+  const visuals = createVisuals({ canvas, load: async () => BrokenHydra, onError: (err) => errors.push(err.message) });
+  await playTrackWithVisuals(visuals);
+  runFrame(1000);
+  assert.deepEqual(errors, ['energyy is not defined']);
+  assert.equal(visuals.isShowing(), false);
+  assert.equal(frames.size, 0, 'no more frames');
+  // a change that fails keeps them stopped; code that runs gives them another go
+  visuals.beforeRun({ fresh: false });
+  visuals.failedRun();
+  assert.equal(visuals.isShowing(), false);
+  await playTrackWithVisuals(visuals);
+  assert.equal(visuals.isShowing(), true);
+});

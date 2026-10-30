@@ -67,10 +67,12 @@ for (const prefix of songPrefixes) await page.route(`${prefix}**`, (route) => ro
 const problems = [];
 // what the test is doing, so errors say when they happened
 let step = 'loading the page';
+// while the test makes mistakes in the code on purpose, Strudel logs them
+let expectErrors = false;
 page.on('pageerror', (err) => problems.push(`${step}: page error: ${err.message}`));
 page.on('console', (msg) => {
   const text = msg.text();
-  if (msg.type() === 'error' || /\[eval\] error|error:/i.test(text)) problems.push(`${step}: console: ${text}`);
+  if (!expectErrors && (msg.type() === 'error' || /\[eval\] error|error:/i.test(text))) problems.push(`${step}: console: ${text}`);
 });
 
 try {
@@ -160,6 +162,60 @@ try {
   const marks = await page.$$eval('[data-role=code] .playing', (nodes) => nodes.map((n) => n.textContent));
   console.log(`marked in the code: ${marks.slice(0, 8).join(' ')}${marks.length > 8 ? ' …' : ''}`);
   if (marks.length === 0) problems.push('code: no notes marked while playing');
+
+  // Guitar chords: the chord now and the next ones, each with its shape.
+  step = 'guitar chords';
+  await page.waitForFunction(() => document.querySelectorAll('.chord svg.diagram').length > 0, null, { timeout: 10000 }).catch(() => {});
+  const chords = await page.$$eval('.chord', (items) => items.map((item) => `${item.querySelector('.when').textContent} ${item.querySelector('.chord-name').textContent}`));
+  console.log(`guitar chords: ${chords.join(' | ')}`);
+  if (!chords.length || !chords[0].startsWith('Now') || (await page.$$('.chord svg.diagram')).length === 0) problems.push(`guitar chords: none shown (${await page.textContent('[data-role=chords-none]')})`);
+
+  // Changing the code while it plays: mistakes keep the music going, a good change takes over.
+  step = 'live edits';
+  const status = () => page.textContent('[data-role=status]');
+  const bar = async () => Number((await page.textContent('[data-role=progress]')).match(/Bar (\d+)/)?.[1]);
+  const original = await page.$eval('[data-role=code-input]', (input) => input.value);
+  const edit = async (text) => {
+    const prior = await status();
+    await page.$eval(
+      '[data-role=code-input]',
+      (input, value) => {
+        input.value = value;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      },
+      text,
+    );
+    await page.focus('[data-role=code-input]');
+    await page.keyboard.press('Control+Enter');
+    await page.waitForFunction((prior) => document.querySelector('[data-role=status]').textContent !== prior, prior, { timeout: 15000 }).catch(() => {});
+    return status();
+  };
+  const before = await bar();
+  const mistakes = [
+    ['a syntax error', original.replace(/\narrange\(/, '\narrange(('), /^Not updated.*Line \d+: /, true],
+    ['an open bracket in mini-notation', original.replace('setcpm(', 's("bd [sd")\nsetcpm('), /^Not updated.*Line \d+: Mini-notation/, true],
+    ['a loop that never ends', `while (true) {}\n${original}`, /^Not updated.*A loop ran/],
+    ['far too many notes', original.replace(/\narrange\(/, '\nstack(s("bd*100000"), arrange(').replace(/\)\s*$/, '))\n'), /^Not updated.*far more than can be played/],
+  ];
+  // Strudel logs the mistakes it is given
+  expectErrors = true;
+  for (const [what, text, expected, located] of mistakes) {
+    const result = await edit(text);
+    console.log(`live edits, ${what}: ${result}`);
+    if (!expected.test(result)) problems.push(`live edits, ${what}: ${result}`);
+    if ((await page.textContent('[data-role=play]')) !== 'Stop') problems.push(`live edits, ${what}: playback stopped`);
+    if (!(await page.isVisible('[data-role=code-error]'))) problems.push(`live edits, ${what}: not shown under the code`);
+    if (located && !(await page.$eval('[data-role=error-line]', (line) => !line.hidden))) problems.push(`live edits, ${what}: its line is not marked`);
+  }
+  expectErrors = false;
+  const good = await edit(original.replace(/\)\s*$/, ').gain(0.9)\n'));
+  const after = await bar();
+  console.log(`live edits, a good change: ${good} · bar ${before} → ${after}`);
+  if (!/^Playing .* \(updated\)$/.test(good)) problems.push(`live edits, a good change: ${good}`);
+  if (!(after >= before)) problems.push(`live edits: the track started again (bar ${before} → ${after})`);
+  if (!(await page.isVisible('[data-role=edited]'))) problems.push('live edits: the changed track is not marked as edited');
+  await page.click('[data-role=revert]');
+  await page.waitForFunction(() => !document.querySelector('[data-role=edited]').checkVisibility(), null, { timeout: 5000 }).catch(() => problems.push('live edits: undo kept the change'));
 
   // Visuals: the switch hides them and brings them back.
   step = 'visuals switch';

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { beforeEach, test } from 'node:test';
 import { JSDOM } from 'jsdom';
-import { createApp, describeTrack } from '../src/app.js';
+import { createApp, describeError, describeTrack } from '../src/app.js';
 import { STORAGE_KEY } from '../src/library.js';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -41,11 +41,34 @@ function fakeEngine({ failInit = false } = {}) {
       engine.played.push(code);
       engine.starts.push(from);
       engine.pos = from;
+      engine.code = code;
+      engine.ver++;
     },
     stop() {
       engine.stops++;
       engine.pos = null;
+      engine.code = null;
     },
+    // changes made while a track plays (see engine.update)
+    updates: [],
+    failUpdate: null,
+    code: null,
+    async update(code) {
+      if (engine.failUpdate) {
+        const err = engine.failUpdate;
+        engine.failUpdate = null;
+        throw err;
+      }
+      engine.updates.push(code);
+      engine.code = code;
+      engine.ver++;
+    },
+    playingCode: () => engine.code,
+    // the events the chords are found in
+    ver: 0,
+    version: () => engine.ver,
+    haps: [],
+    query: (begin, end) => engine.haps.filter((h) => h.whole.begin < end && h.whole.end > begin),
     seek(bar) {
       engine.seeks.push(bar);
       engine.pos = bar;
@@ -93,6 +116,8 @@ async function start(options = {}) {
     storage: options.storage ?? null,
     location: options.location ?? dom.window.location,
     visuals: options.visuals ?? null,
+    // the chords are worked out at once, however busy the test machine is
+    clock: () => 0,
   });
   return { app, engine };
 }
@@ -1025,4 +1050,330 @@ test('blocked storage does not stop the songs from GitHub', async () => {
 
 test('describeTrack puts the credits first', () => {
   assert.equal(describeTrack({ credits: 'By A Composer', bpm: 120, bars: 8 }), 'By A Composer · 120 BPM · 0:16');
+});
+
+
+// Changing the code, in the editor over the highlighted code.
+const editorInput = () => $('[data-role=code-input]');
+function typeCode(text) {
+  editorInput().value = text;
+  editorInput().dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+}
+const pressKey = (init) => editorInput().dispatchEvent(new dom.window.KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }));
+const located = (message, location) => Object.assign(new Error(message), { location });
+
+test('the code can be changed: the change is kept, marked and opens in strudel.cc', async () => {
+  const storage = new MemoryStorage();
+  const { app } = await start({ storage });
+  const original = app.library.get('repo:nachtschicht').code;
+  assert.equal(editorInput().value, original);
+  assert.equal(editorInput().readOnly, false);
+  assert.equal($('[data-role=edited]').hidden, true);
+  assert.equal($('[data-role=revert]').hidden, true);
+  const changed = original.replace('const bpm = 174', 'const bpm = 170');
+  typeCode(changed);
+  assert.equal($('[data-role=edited]').hidden, false);
+  assert.equal($('[data-role=revert]').hidden, false);
+  assert.ok($('.track[data-id="repo:nachtschicht"]').classList.contains('edited'));
+  assert.match($('[data-role=code-hint]').textContent, /Play or Ctrl\+Enter plays it as changed/);
+  assert.deepEqual(JSON.parse(storage.data['vibe-player:drafts']), { 'repo:nachtschicht': changed });
+
+  // the next visit
+  dom = new JSDOM(html, { url: 'https://example.test/vibe-soundlab/' });
+  doc = dom.window.document;
+  await start({ storage });
+  assert.equal(editorInput().value, changed);
+  assert.equal($('[data-role=edited]').hidden, false);
+  // changed back by hand: no change any more
+  typeCode(original);
+  assert.equal($('[data-role=edited]').hidden, true);
+  assert.deepEqual(JSON.parse(storage.data['vibe-player:drafts']), {});
+});
+
+test('strudel.cc gets the code as changed', async () => {
+  const { app } = await start();
+  const original = $('[data-role=open]').href;
+  typeCode(`${app.library.get('repo:nachtschicht').code}\n// mine`);
+  assert.notEqual($('[data-role=open]').href, original);
+  app.select('repo:nebelhorn');
+  app.select('repo:nachtschicht');
+  assert.match(editorInput().value, /\/\/ mine$/, 'a change stays when another track was picked in between');
+});
+
+test('Play and Ctrl+Enter play the code as changed', async () => {
+  const { engine } = await start();
+  typeCode('s("bd*2")');
+  click($('[data-role=play]'));
+  await settle();
+  assert.deepEqual(engine.played, ['s("bd*2")']);
+  assert.equal($('[data-role=apply]').disabled, true, 'nothing to update: it plays as it is');
+  click($('[data-role=play]'));
+  await settle();
+  pressKey({ key: 'Enter', ctrlKey: true });
+  await settle();
+  assert.deepEqual(engine.played, ['s("bd*2")', 's("bd*2")']);
+  pressKey({ key: '.', ctrlKey: true });
+  assert.equal(engine.stops, 2);
+});
+
+test('while a track plays, Update swaps the change in without starting it again', async () => {
+  dom.window.HTMLCanvasElement.prototype.getContext = () => null;
+  const { app, engine } = await start();
+  click($('[data-role=play]'));
+  await settle();
+  const original = app.library.get('repo:nachtschicht').code;
+  const at = (code, text) => ({ start: code.indexOf(text), end: code.indexOf(text) + text.length });
+  engine.locations = [at(original, 'RolandJD990')];
+  app.drawFrame(100);
+  assert.equal($$('[data-role=code] .playing').length, 1);
+  const changed = `// faster\n${original}`;
+  typeCode(changed);
+  assert.equal($('[data-role=apply]').disabled, false);
+  assert.match($('[data-role=code-hint]').textContent, /Changed, not playing yet/);
+  app.drawFrame(200);
+  assert.equal($$('[data-role=code] .playing').length, 0, 'the marks would land in the wrong places');
+  click($('[data-role=apply]'));
+  await settle();
+  assert.deepEqual(engine.updates, [changed]);
+  assert.equal(engine.played.length, 1, 'not started again');
+  assert.match($('[data-role=status]').textContent, /Playing Nachtschicht \(updated\)/);
+  assert.equal($('[data-role=apply]').disabled, true);
+  engine.locations = [at(changed, 'RolandJD990')];
+  app.drawFrame(300);
+  assert.deepEqual($$('[data-role=code] .playing').map((n) => n.textContent), ['RolandJD990']);
+});
+
+test('a change with an error keeps the music playing and shows where the error is', async () => {
+  const { app, engine } = await start();
+  click($('[data-role=play]'));
+  await settle();
+  typeCode('note("c3")\n  .s("saw"');
+  engine.failUpdate = located('Unexpected token (2:11)', { position: 21, line: 2, column: 11 });
+  pressKey({ key: 'Enter', ctrlKey: true });
+  await settle();
+  assert.match($('[data-role=status]').textContent, /Not updated, Nachtschicht plays on as before\. Line 2: Unexpected token$/);
+  assert.ok($('[data-role=status]').classList.contains('error'));
+  assert.equal($('[data-role=play]').textContent, 'Stop');
+  const error = $('[data-role=code-error]');
+  assert.equal(error.hidden, false);
+  assert.equal(error.textContent, 'Line 2: Unexpected token (show)');
+  assert.equal($('[data-role=error-line]').hidden, false);
+  click(error);
+  assert.equal(doc.activeElement, editorInput());
+  assert.equal(editorInput().selectionStart, 21);
+  // picking another track and back keeps the error with its code
+  app.select('repo:nebelhorn');
+  assert.equal($('[data-role=code-error]').hidden, true);
+  app.select('repo:nachtschicht');
+  assert.equal($('[data-role=code-error]').hidden, false);
+  // fixing it clears the error
+  typeCode('note("c3")\n  .s("saw")');
+  assert.equal($('[data-role=code-error]').hidden, true);
+  assert.equal($('[data-role=error-line]').hidden, true);
+  engine.failUpdate = new Error('nope is not defined');
+  click($('[data-role=apply]'));
+  await settle();
+  assert.equal($('[data-role=code-error]').textContent, 'nope is not defined', 'no place to show');
+  click($('[data-role=code-error]'));
+});
+
+test('an error when a track starts is shown in its code too', async () => {
+  const { engine } = await start();
+  engine.failNext = located('[mini] parse error at line 1: Expected "]" but "\\"" found.', { position: 5, line: 1, column: 6 });
+  click($('[data-role=play]'));
+  await settle();
+  assert.match($('[data-role=status]').textContent, /Could not play Nachtschicht: Line 1: Mini-notation: the string ends before a bracket or group in it is closed\./);
+  assert.equal($('[data-role=error-line]').hidden, false);
+  click($('[data-role=play]'));
+  await settle();
+  assert.equal($('[data-role=code-error]').hidden, true, 'it plays now: the error is gone');
+});
+
+test('Undo my changes brings back the track as it is, also while it plays', async () => {
+  const storage = new MemoryStorage();
+  const { app, engine } = await start({ storage });
+  const original = app.library.get('repo:nachtschicht').code;
+  typeCode('s("bd")');
+  click($('[data-role=play]'));
+  await settle();
+  click($('[data-role=revert]'));
+  await settle();
+  assert.equal(editorInput().value, original);
+  assert.deepEqual(engine.updates, [original], 'and it plays as it was');
+  assert.equal($('[data-role=revert]').hidden, true);
+  assert.deepEqual(JSON.parse(storage.data['vibe-player:drafts']), {});
+  assert.equal(app.revert(), null, 'nothing to undo');
+  typeCode('s("sd")');
+  app.stop();
+  app.revert();
+  assert.deepEqual(engine.updates, [original], 'stopped: only the code comes back');
+});
+
+test('the engine’s errors while playing are shown', async () => {
+  const { app, engine } = await start();
+  app.playbackError(new Error('ignored'), { stopped: true });
+  assert.doesNotMatch($('[data-role=status]').textContent, /ignored/, 'nothing plays');
+  click($('[data-role=play]'));
+  await settle();
+  app.playbackError(new Error('v.nope is undefined'));
+  assert.match($('[data-role=status]').textContent, /Error while playing Nachtschicht: v.nope is undefined/);
+  typeCode('s("bd*100000")');
+  engine.code = 's("bd")';
+  app.playbackError(new Error('The pattern plays 4000 notes'), { reverted: true, code: 's("bd")' });
+  assert.match($('[data-role=status]').textContent, /Your change failed while playing, so the version before it plays again\. The pattern plays 4000 notes/);
+  assert.equal($('[data-role=apply]').disabled, false, 'the change can be tried again');
+  assert.equal($('[data-role=code-error]').textContent, 'The pattern plays 4000 notes');
+  app.playbackError(new Error('too slow'), { stopped: true });
+  assert.match($('[data-role=status]').textContent, /Stopped Nachtschicht: too slow/);
+  assert.equal($('[data-role=play]').textContent, 'Play');
+  assert.equal($('.track.playing'), null);
+});
+
+test('a playback error while the next track loads frees the button', async () => {
+  const engine = slowEngine();
+  const { app } = await start({ engine });
+  app.play();
+  app.playbackError(new Error('flood'), { stopped: true });
+  assert.equal($('[data-role=play]').textContent, 'Play');
+  assert.equal($('[data-role=play]').disabled, false);
+  engine.pending[0].resolve();
+  await settle();
+  assert.equal($('[data-role=play]').textContent, 'Play', 'the stopped play does not come back');
+});
+
+test('errors in the visuals are shown', async () => {
+  const { app } = await start();
+  app.visualsError(new Error('energyy is not defined'));
+  assert.match($('[data-role=status]').textContent, /^The visuals stopped: energyy is not defined/);
+  click($('[data-role=play]'));
+  await settle();
+  app.visualsError(new Error('x'));
+  assert.match($('[data-role=status]').textContent, /The visuals stopped in Nachtschicht: x/);
+});
+
+test('code that is still loading from GitHub cannot be changed', async () => {
+  const { app } = await startWithSongs();
+  await app.showExternal();
+  pickSong('ext:demo-dawn');
+  assert.equal(editorInput().readOnly, true);
+  typeCode('typed too early');
+  await settle();
+  assert.equal(editorInput().value, '$: s("bd*2")', 'the song as it came');
+  assert.equal(editorInput().readOnly, false);
+  assert.equal($('[data-role=edited]').hidden, true);
+});
+
+test('removing an upload drops its change', async () => {
+  const storage = new MemoryStorage();
+  const { app } = await start({ storage });
+  await app.addFiles([fileLike('mine.js', 's("bd")')]);
+  typeCode('s("sd")');
+  assert.deepEqual(Object.keys(JSON.parse(storage.data['vibe-player:drafts'])), ['upload:mine']);
+  app.removeUpload('upload:mine');
+  assert.deepEqual(JSON.parse(storage.data['vibe-player:drafts']), {});
+});
+
+test('blocked or broken storage keeps changes for the visit', async () => {
+  const blocked = { getItem: () => { throw new Error('denied'); }, setItem: () => { throw new Error('denied'); } };
+  const { app } = await start({ storage: blocked });
+  typeCode('s("bd")');
+  assert.equal($('[data-role=edited]').hidden, false);
+  app.toggleSimpleChords();
+  assert.equal($('[data-role=chords-simple]').getAttribute('aria-pressed'), 'true');
+  const broken = new MemoryStorage();
+  broken.setItem('vibe-player:drafts', '{not json');
+  dom = new JSDOM(html, { url: 'https://example.test/vibe-soundlab/' });
+  doc = dom.window.document;
+  await start({ storage: broken });
+  assert.equal($('[data-role=edited]').hidden, true);
+});
+
+test('error messages name the line and say what is wrong', () => {
+  assert.equal(describeError(located('Unexpected token (3:5)', { line: 3 })), 'Line 3: Unexpected token');
+  assert.equal(describeError(new Error('x is not defined')), 'x is not defined');
+  assert.equal(describeError('plain'), 'plain');
+});
+
+// Guitar chords, from the events the engine gives.
+const noteHap = (note, begin, end) => ({ value: { note }, whole: { begin, end }, part: { begin, end } });
+const chordHaps = (names, begin, end) => names.split(' ').map((note) => noteHap(note, begin, end));
+
+test('the chords of what plays are shown with their guitar shapes', async () => {
+  dom.window.HTMLCanvasElement.prototype.getContext = () => null;
+  const storage = new MemoryStorage();
+  const { app, engine } = await start({ storage });
+  assert.equal($('[data-role=chords-none]').textContent, 'The chords show up here while a track plays.');
+  assert.equal($('[data-role=chord-row]').hidden, true);
+  engine.haps = [...chordHaps('f2 ab2 c3 eb3', 0, 2), ...chordHaps('db2 f2 ab2 c3', 2, 3.5), ...chordHaps('bb2 db3 f3', 3.5, 4)];
+  click($('[data-role=play]'));
+  await settle();
+  engine.pos = 0.2;
+  app.drawFrame(1000);
+  const shown = () => $$('.chord').map((c) => `${c.querySelector('.when').textContent} ${c.querySelector('.chord-name').textContent}`);
+  assert.deepEqual(shown(), ['Now Fm7', 'Bar 3 Dbmaj7', 'Bar 4 · beat 3 Bbm', 'Bar 5 –'], 'flats, as in F minor; nothing plays after bar 4');
+  assert.equal($$('.chord svg.diagram').length, 3);
+  assert.ok($('.chord.now'));
+  assert.equal($('.chord svg').getAttribute('aria-label'), 'Fm7: 1 3 1 1 1 1 (low E to high e)');
+  assert.equal($('[data-role=chords-none]').hidden, true);
+
+  app.drawFrame(1050);
+  engine.pos = 2.4;
+  app.drawFrame(1060);
+  assert.equal(shown()[0], 'Now Fm7', 'at most ten updates a second');
+  app.drawFrame(1200);
+  assert.deepEqual(shown(), ['Now Dbmaj7', 'Bar 4 · beat 3 Bbm', 'Bar 5 –']);
+  const row = $('[data-role=chord-row]').firstChild;
+  app.drawFrame(1400);
+  assert.equal($('[data-role=chord-row]').firstChild, row, 'nothing new, nothing redrawn');
+
+  click($('[data-role=chords-simple]'));
+  app.drawFrame(1600);
+  assert.deepEqual(shown(), ['Now Db', 'Bar 4 · beat 3 Bbm', 'Bar 5 –']);
+  assert.equal(storage.data['vibe-player:chords'], 'simple');
+  click($('[data-role=chords-simple]'));
+  assert.equal(storage.data['vibe-player:chords'], 'full');
+
+  click($('[data-role=play]'));
+  app.drawFrame(2000);
+  assert.equal($('[data-role=chord-row]').hidden, true);
+  assert.equal($('[data-role=chords-none]').textContent, 'The chords show up here while a track plays.');
+});
+
+test('simple chords are remembered for the next visit', async () => {
+  const storage = new MemoryStorage();
+  storage.setItem('vibe-player:chords', 'simple');
+  await start({ storage });
+  assert.equal($('[data-role=chords-simple]').getAttribute('aria-pressed'), 'true');
+});
+
+test('drums alone have no chords, and new code finds them again', async () => {
+  dom.window.HTMLCanvasElement.prototype.getContext = () => null;
+  const { app, engine } = await start();
+  engine.haps = [{ value: { s: 'bd' }, whole: { begin: 0, end: 0.25 }, part: { begin: 0, end: 0.25 } }];
+  click($('[data-role=play]'));
+  await settle();
+  engine.pos = 0;
+  app.drawFrame(1000);
+  assert.equal($('[data-role=chords-none]').textContent, 'No chords here: only drums, noise or single notes play.');
+  engine.haps = chordHaps('c3 e3 g3', 0, 20);
+  app.drawFrame(1200);
+  assert.equal($('[data-role=chords-none]').hidden, false, 'what was worked out stays until the pattern changes');
+  typeCode('note("c e g")');
+  click($('[data-role=apply]'));
+  await settle();
+  app.drawFrame(1400);
+  assert.deepEqual($$('.chord .chord-name').map((n) => n.textContent), ['C']);
+});
+
+test('a stretch with no chord, and a song without a key', async () => {
+  dom.window.HTMLCanvasElement.prototype.getContext = () => null;
+  const { app, engine } = await start();
+  await app.addFiles([fileLike('loop.js', 's("bd")')]);
+  engine.haps = [...chordHaps('c#3 f3 g#3', 0, 1), noteHap('c3', 1, 2)];
+  click($('[data-role=play]'));
+  await settle();
+  engine.pos = 0;
+  app.drawFrame(1000);
+  assert.deepEqual($$('.chord .chord-name').map((n) => n.textContent), ['C#', '–'], 'sharps, as the notes are written');
+  assert.equal($$('.chord .no-chord').map((n) => n.textContent).join(), 'No chord');
 });
