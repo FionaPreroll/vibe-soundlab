@@ -175,6 +175,40 @@ test('when Hydra cannot start, tracks still run with stand-ins', async (t) => {
   visuals.beforeRun();
 });
 
+test('every track that starts Hydra gets its functions back, after other songs put their own there', async () => {
+  const noise = () => 'Hydra noise';
+  class GlobalHydra extends FakeHydra {
+    constructor(options) {
+      super(options);
+      this.synth = { noise, speed: 1 };
+      Object.assign(options.canvas.ownerDocument.defaultView, this.synth);
+    }
+  }
+  const visuals = createVisuals({ canvas, load: async () => GlobalHydra });
+  await playTrackWithVisuals(visuals);
+  Object.assign(win, { noise: 'Strudel noise', speed: 'Strudel speed' });
+  await playTrackWithVisuals(visuals);
+  assert.equal(win.noise, noise);
+  assert.equal(win.speed, 1);
+});
+
+test('Hydra’s array helpers stay out of for…in, which Strudel runs all() with', async (t) => {
+  class ArrayHydra extends FakeHydra {
+    constructor(options) {
+      super(options);
+      Array.prototype.wobble = function wobble() {
+        return this;
+      };
+    }
+  }
+  t.after(() => delete Array.prototype.wobble);
+  await createVisuals({ canvas, load: async () => ArrayHydra }).initHydra();
+  const keys = [];
+  for (const key in ['a']) keys.push(key);
+  assert.deepEqual(keys, ['0']);
+  assert.equal(typeof [].wobble, 'function', 'Hydra still has them');
+});
+
 test('the stand-in accepts any chain and counts as zero', () => {
   const hydra = inertHydra();
   const chain = hydra(1).rotate(0.2).color(1, 0, 0).out();

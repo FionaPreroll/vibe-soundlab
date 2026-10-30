@@ -172,6 +172,9 @@ importers:
       '@strudel/mini':
         specifier: 1.2.6
         version: 1.2.6
+      '@strudel/soundfonts':
+        specifier: 1.2.6
+        version: 1.2.6
       '@strudel/tonal':
         specifier: 1.2.6
         version: 1.2.6
@@ -274,6 +277,9 @@ packages:
   '@strudel/mini@1.2.6':
     resolution: {integrity: sha512-I5GFPLHI3TPcJuD2RdDcurA+lTogaSQ0TB+EimKTgEtSAbU6ZMEkSUOXZIFO5eaAcJcMucgKaBcmTKpD4oZjPA==}
     engines: {node: '>=18.0.0'}
+
+  '@strudel/soundfonts@1.2.6':
+    resolution: {integrity: sha512-F7eBhohkCXCMo8WiufSAhD3JCfL5GTgCh9RlOJVT+1swiFeIss1vUAWJR3WjonB6moL8BiuNpcYOqO6i6cFy4A==}
 
   '@strudel/tonal@1.2.5':
     resolution: {integrity: sha512-mX3uW0nWH8Sa52HTLwnxlR5BrejFX77abeaiMbp+kQCMrX9I+XRdf8rEr7gdeInB6f/y2TzTVFpnsNsB5jLdoA==}
@@ -717,6 +723,15 @@ packages:
     resolution: {integrity: sha512-xAg7SOnEhrm5zI3puOOKyy1OMcMlIJZYNJY7xLBwSze0UjhPLnWfj2GF2EpT0jmzaJKIWKHLsaSSajf35bcYnA==}
     engines: {node: '>=v12.22.7'}
 
+  sfumato@0.1.2:
+    resolution: {integrity: sha512-j2s5BLUS5VUNtaK1l+v+yal3XjjV7JXCQIwE5Xs4yiQ3HJ+2Fc/dd3IkkrVHn0AJO2epShSWVoP3GnE0TvPdMg==}
+
+  soundfont2@0.4.0:
+    resolution: {integrity: sha512-537WiurDBRbDLVhJMxXLE06D6yWxJCidfPClnibZ0f8dKMDpv+0fIfwCQ8pELE0JqKX05SOJosNJgKzQobaAEA==}
+
+  soundfont2@0.5.0:
+    resolution: {integrity: sha512-dcmNVtHT/Y8BOOrtmjt7hn6Bk6bB1g+O2bWB9fa6emW7kfwiEiEL4VvGQfwVt8g0m58LyoqVyuQ4ZFukMLwGHQ==}
+
   source-map@0.6.1:
     resolution: {integrity: sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==}
     engines: {node: '>=0.10.0'}
@@ -879,6 +894,13 @@ snapshots:
   '@strudel/mini@1.2.6':
     dependencies:
       '@strudel/core': 1.2.6
+
+  '@strudel/soundfonts@1.2.6':
+    dependencies:
+      '@strudel/core': 1.2.5
+      '@strudel/webaudio': 1.2.6
+      sfumato: 0.1.2
+      soundfont2: 0.5.0
 
   '@strudel/tonal@1.2.5':
     dependencies:
@@ -1441,6 +1463,14 @@ snapshots:
   saxes@6.0.0:
     dependencies:
       xmlchars: 2.2.0
+
+  sfumato@0.1.2:
+    dependencies:
+      soundfont2: 0.4.0
+
+  soundfont2@0.4.0: {}
+
+  soundfont2@0.5.0: {}
 
   source-map@0.6.1:
     optional: true

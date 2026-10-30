@@ -10,11 +10,13 @@
     "coverage": "node --import ./test/support/register.js --test --experimental-test-coverage --test-coverage-include=\"src/**\" --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=lcov.info \"test/**/*.test.js\"",
     "e2e": "node test/e2e/player.e2e.js",
     "tracks": "node scripts/index-tracks.js",
+    "sources": "node scripts/index-sources.js",
     "samples": "node scripts/snapshot-samples.js"
   },
   "devDependencies": {
     "@strudel/core": "1.2.6",
     "@strudel/mini": "1.2.6",
+    "@strudel/soundfonts": "1.2.6",
     "@strudel/tonal": "1.2.6",
     "@strudel/transpiler": "1.2.6",
     "@strudel/web": "1.2.6",

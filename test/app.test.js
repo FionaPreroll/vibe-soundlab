@@ -685,3 +685,344 @@ test('the code is highlighted and the sounding notes are marked', async () => {
   app.select('repo:nebelhorn');
   assert.equal(code.firstChild, before, 'the same code is not rendered again');
 });
+
+// Songs from other GitHub repositories, with a made-up index and made-up songs.
+const COMMIT = 'd'.repeat(40);
+const songIndex = {
+  sources: [
+    {
+      id: 'demo',
+      repo: 'someone/strudel-songs',
+      name: 'someone',
+      about: 'Covers and originals.',
+      commit: COMMIT,
+      songs: [
+        { path: 'nightbus.js', group: 'Songs', title: 'Night Bus', note: 'Work in progress', credits: [{ role: 'song', name: 'The Band' }, { role: 'script', name: 'someone' }] },
+        { path: 'dawn.js', group: 'Songs', title: 'Dawn' },
+        { path: 'jams/rain.js', group: 'Jam sessions', title: 'Rain Jam' },
+      ],
+    },
+    {
+      id: 'other',
+      repo: 'another/live-codes',
+      name: 'another',
+      commit: COMMIT,
+      songs: [{ path: 'songs/cave.js', group: 'Covers', title: 'Cave Theme', credits: [{ role: '', name: 'A Composer' }] }],
+    },
+  ],
+};
+const raw = (repo, path) => `https://raw.githubusercontent.com/${repo}/${COMMIT}/${path}`;
+const songCode = {
+  [raw('someone/strudel-songs', 'nightbus.js')]: '// "Night Bus" (work in progress)\nsetcpm(30)\n$: note("c3 e3").s("gm_piano")._pianoroll()',
+  [raw('someone/strudel-songs', 'dawn.js')]: '$: s("bd*2")',
+  [raw('someone/strudel-songs', 'jams/rain.js')]: '// @bpm 120\n// @bars 8\n$: s("hh*8")',
+  [raw('another/live-codes', 'songs/cave.js')]: '$: n("0 2").scale("c:minor").o(2)',
+};
+
+/** Serves the repo, the song index and the songs, and notes every URL asked for. */
+function githubFetch({ index = songIndex, songs = songCode } = {}) {
+  const urls = [];
+  const fetchFn = async (url) => {
+    urls.push(url);
+    if (url === 'sources/index.json') return index ? response(JSON.stringify(index)) : response('', false, 500);
+    if (url.startsWith('https://')) return url in songs ? response(songs[url]) : response('', false, 404);
+    return repoFetch(url);
+  };
+  fetchFn.urls = urls;
+  fetchFn.external = () => urls.filter((u) => u === 'sources/index.json' || u.startsWith('https://'));
+  return fetchFn;
+}
+
+const songNames = () => $$('[data-role=external-list] .song:not([hidden]) .name').map((n) => n.firstChild.textContent);
+const sourceList = (id) => $(`[data-role=external-list] [data-source="${id}"]`);
+const pickSong = (id) => click($(`.song[data-id="${id}"] .pick`));
+
+async function startWithSongs(options = {}) {
+  const fetchFn = options.fetchFn ?? githubFetch();
+  const started = await start({ ...options, fetchFn });
+  return { ...started, fetchFn };
+}
+
+test('songs from GitHub stay hidden and unloaded until switched on', async () => {
+  const { fetchFn } = await startWithSongs();
+  assert.equal($('[data-role=external-consent]').hidden, false);
+  assert.equal($('[data-role=external-browse]').hidden, true);
+  assert.deepEqual(
+    $$('[data-role=external-names] a').map((a) => [a.textContent, a.href]),
+    [
+      ['eefano', 'https://github.com/eefano/strudel-songs-collection'],
+      ['tzwaan', 'https://github.com/tzwaan/strudel-scripts'],
+      ['MariaAreadne', 'https://github.com/Mariaareadne1/maria-live-codes'],
+    ],
+  );
+  assert.match($('[data-role=external-consent]').textContent, /eefano, tzwaan and MariaAreadne share .* runs its code in this page/);
+  assert.deepEqual(fetchFn.external(), [], 'nothing asked from GitHub, not even the list');
+  assert.deepEqual(names(), repoTracks.map((t) => t.title));
+});
+
+test('switched on, they are listed per repository and folder, and the choice is kept', async () => {
+  const storage = new MemoryStorage();
+  const { app, fetchFn } = await startWithSongs({ storage });
+  click($('[data-role=external-on]'));
+  await settle();
+  assert.equal(storage.data['vibe-player:external'], 'on');
+  assert.equal($('[data-role=external-consent]').hidden, true);
+  assert.equal($('[data-role=external-browse]').hidden, false);
+  assert.deepEqual(fetchFn.external(), ['sources/index.json'], 'only the list; songs load when picked');
+  assert.deepEqual($$('.source .source-name').map((n) => n.textContent), ['someone', 'another']);
+  assert.deepEqual($$('.source .count').map((n) => n.textContent), ['3 songs', '1 songs']);
+  assert.match(sourceList('demo').querySelector('.source-about').textContent, /Covers and originals\. someone\/strudel-songs/);
+  assert.deepEqual($$('[data-source="demo"] .group').map((n) => n.textContent), ['Songs', 'Jam sessions']);
+  assert.deepEqual(songNames(), ['Night Bus', 'Dawn', 'Rain Jam', 'Cave Theme']);
+  const night = $('.song[data-id="ext:demo-nightbus"]');
+  assert.equal(night.querySelector('.name small').textContent, 'Work in progress');
+  assert.equal(night.querySelector('.sub').textContent, 'Song by The Band · script by someone');
+  assert.equal(sourceList('demo').open, false, 'folded until opened');
+  assert.deepEqual(names(), repoTracks.map((t) => t.title), 'the track list stays as it was');
+  await app.showExternal();
+  assert.equal(fetchFn.external().length, 1, 'switching on twice loads once');
+
+  dom = new JSDOM(html, { url: 'https://example.test/vibe-soundlab/' });
+  doc = dom.window.document;
+  const again = githubFetch();
+  await start({ storage, fetchFn: again });
+  assert.equal($('[data-role=external-browse]').hidden, false, 'on again on the next visit');
+  assert.deepEqual(songNames(), ['Night Bus', 'Dawn', 'Rain Jam', 'Cave Theme']);
+});
+
+test('picking a song loads its code from GitHub at the listed commit and shows where it is from', async () => {
+  const { app, engine, fetchFn } = await startWithSongs();
+  await app.showExternal();
+  pickSong('ext:demo-nightbus');
+  assert.match($('[data-role=status]').textContent, /Loading Night Bus from GitHub…/);
+  assert.equal($('[data-role=open]').href, 'https://strudel.cc/', 'no code to open yet');
+  await settle();
+  assert.match($('[data-role=open]').href, /^https:\/\/strudel\.cc\/#.+/);
+  assert.deepEqual(fetchFn.external().slice(1), [raw('someone/strudel-songs', 'nightbus.js')]);
+  assert.equal($('[data-role=status]').textContent, '');
+  assert.equal($('[data-role=title]').textContent, 'Night Bus');
+  assert.equal($('[data-role=details]').textContent, 'Song by The Band · script by someone');
+  assert.equal($('[data-role=about]').textContent, 'Work in progress');
+  assert.equal($('[data-role=origin]').hidden, false);
+  assert.equal($('[data-role=origin]').textContent, 'From someone/strudel-songs/nightbus.js on GitHub');
+  assert.equal($('[data-role=origin] a').href, `https://github.com/someone/strudel-songs/blob/${COMMIT}/nightbus.js`);
+  assert.match($('[data-role=code]').textContent, /_pianoroll/);
+  assert.ok($('.song[data-id="ext:demo-nightbus"]').classList.contains('selected'));
+  assert.equal($('.song.selected .pick').hasAttribute('aria-current'), true);
+  assert.equal(location().hash, '#demo-nightbus');
+  assert.deepEqual($$('.strip .name').map((n) => n.textContent).slice(0, 3), ['Orbit 1', 'Orbit 2', 'Orbit 3']);
+  assert.equal(engine.played.length, 0, 'picking only loads it');
+
+  click($('[data-role=play]'));
+  await settle();
+  assert.equal(engine.played[0], songCode[raw('someone/strudel-songs', 'nightbus.js')]);
+  assert.ok($('.song[data-id="ext:demo-nightbus"]').classList.contains('playing'));
+  pickSong('ext:demo-dawn');
+  await settle();
+  assert.equal(engine.played[1], '$: s("bd*2")', 'while playing, picking a song plays it once it has loaded');
+  assert.equal(fetchFn.external().filter((u) => u.endsWith('nightbus.js')).length, 1, 'loaded once');
+  assert.equal($('[data-role=origin]').hidden, false);
+  app.select('repo:nachtschicht');
+  assert.equal($('[data-role=origin]').hidden, true);
+});
+const location = () => dom.window.location;
+
+test('songs that GitHub cannot deliver are explained', async () => {
+  const big = 'x'.repeat(300 * 1024);
+  const fetchFn = githubFetch({ songs: { [raw('someone/strudel-songs', 'dawn.js')]: big, [raw('someone/strudel-songs', 'jams/rain.js')]: '   ' } });
+  const { app, engine } = await startWithSongs({ fetchFn });
+  await app.showExternal();
+  pickSong('ext:demo-nightbus');
+  await settle();
+  assert.equal($('[data-role=status]').textContent, 'Could not load Night Bus: GitHub answered 404.');
+  assert.equal($('[data-role=status]').classList.contains('error'), true);
+  pickSong('ext:demo-dawn');
+  await settle();
+  assert.match($('[data-role=status]').textContent, /Could not load Dawn: dawn\.js is larger than 256 KB\./);
+  await app.select('ext:demo-jams-rain', { autoplay: true });
+  assert.match($('[data-role=status]').textContent, /Could not play Rain Jam: jams\/rain\.js is empty\./);
+  assert.equal(engine.played.length, 0);
+
+  const offline = async (url) => {
+    if (url.startsWith('https://')) throw new TypeError('Failed to fetch');
+    return githubFetch()(url);
+  };
+  dom = new JSDOM(html, { url: 'https://example.test/vibe-soundlab/' });
+  doc = dom.window.document;
+  const second = await start({ fetchFn: offline });
+  await second.app.showExternal();
+  pickSong('ext:other-songs-cave');
+  await settle();
+  assert.equal($('[data-role=status]').textContent, "Could not load Cave Theme: GitHub can't be reached (Failed to fetch).");
+});
+
+test('a song picked away from before its code arrives leaves the status alone', async () => {
+  let release;
+  const gate = new Promise((resolve) => (release = resolve));
+  const plain = githubFetch();
+  const fetchFn = async (url) => (url.endsWith('nightbus.js') ? (await gate, response('', false, 503)) : plain(url));
+  const { app } = await startWithSongs({ fetchFn });
+  await app.showExternal();
+  pickSong('ext:demo-nightbus');
+  app.select('repo:nebelhorn');
+  release();
+  await settle();
+  await settle();
+  assert.equal($('[data-role=title]').textContent, 'Nebelhorn');
+  assert.doesNotMatch($('[data-role=status]').textContent, /Could not/);
+});
+
+test('stopping while a song comes from GitHub keeps it silent', async () => {
+  let release;
+  const gate = new Promise((resolve) => (release = resolve));
+  const plain = githubFetch();
+  const fetchFn = async (url) => (url.endsWith('dawn.js') ? (await gate, plain(url)) : plain(url));
+  const { app, engine } = await startWithSongs({ fetchFn });
+  await app.showExternal();
+  app.select('ext:demo-dawn');
+  const playing = app.play();
+  app.stop();
+  release();
+  await playing;
+  assert.equal(engine.played.length, 0);
+  assert.match($('[data-role=status]').textContent, /Stopped/);
+});
+
+test('finding songs filters by title, credits and folder and opens their lists', async () => {
+  const { app } = await startWithSongs();
+  await app.showExternal();
+  const find = $('[data-role=external-find]');
+  const type = (text) => {
+    find.value = text;
+    find.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+  };
+  type('the band');
+  assert.deepEqual(songNames(), ['Night Bus']);
+  assert.equal(sourceList('demo').open, true);
+  assert.equal(sourceList('other').hidden, true);
+  assert.equal($('[data-source="demo"] .songs:last-of-type').hidden, true, 'a folder without matches hides');
+  type('composer cave');
+  assert.deepEqual(songNames(), ['Cave Theme']);
+  type('jam');
+  assert.deepEqual(songNames(), ['Rain Jam']);
+  type('nothing like this');
+  assert.deepEqual(songNames(), []);
+  assert.equal($('[data-role=external-none]').hidden, false);
+  type('');
+  assert.deepEqual(songNames(), ['Night Bus', 'Dawn', 'Rain Jam', 'Cave Theme']);
+  assert.equal(sourceList('demo').open, false, 'back as it was');
+  assert.equal($('[data-role=external-none]').hidden, true);
+});
+
+test('lists keep being open or folded as the listener left them', async () => {
+  const { app } = await startWithSongs();
+  await app.showExternal();
+  const demo = sourceList('demo');
+  demo.open = true;
+  demo.dispatchEvent(new dom.window.Event('toggle'));
+  const find = $('[data-role=external-find]');
+  find.value = 'cave';
+  find.dispatchEvent(new dom.window.Event('input'));
+  demo.dispatchEvent(new dom.window.Event('toggle'));
+  find.value = '';
+  find.dispatchEvent(new dom.window.Event('input'));
+  assert.equal(demo.open, true);
+  demo.open = false;
+  demo.dispatchEvent(new dom.window.Event('toggle'));
+  find.dispatchEvent(new dom.window.Event('input'));
+  assert.equal(demo.open, false);
+});
+
+test('next, previous and the end of a song stay in the list it is in', async () => {
+  const { app, engine } = await startWithSongs();
+  await app.showExternal();
+  app.select('ext:demo-dawn');
+  click($('[data-role=next]'));
+  assert.equal($('[data-role=title]').textContent, 'Rain Jam');
+  click($('[data-role=next]'));
+  click($('[data-role=next]'));
+  assert.equal($('[data-role=title]').textContent, 'Night Bus', 'wraps around within the songs from GitHub');
+  assert.equal(sourceList('demo').open, true, 'the list of the song shown opens');
+  click($('[data-role=prev]'));
+  assert.equal($('[data-role=title]').textContent, 'Cave Theme');
+  assert.equal(sourceList('other').open, true);
+
+  // Rain Jam has a length (@bars 8): when it ends, the next song from GitHub plays.
+  await app.select('ext:demo-jams-rain', { autoplay: true });
+  engine.pos = 8;
+  app.updateProgress();
+  await settle();
+  assert.equal($('[data-role=title]').textContent, 'Cave Theme');
+
+  app.select(lastTrackId);
+  click($('[data-role=next]'));
+  assert.equal($('[data-role=title]').textContent, 'Nachtschicht', 'the tracks keep to their own list');
+});
+
+test('switched off, the songs go away, and a song from GitHub that plays stops', async () => {
+  const storage = new MemoryStorage();
+  const { app, engine } = await startWithSongs({ storage });
+  await app.showExternal();
+  await app.select('ext:demo-dawn', { autoplay: true });
+  assert.equal(engine.played.length, 1);
+  click($('[data-role=external-off]'));
+  assert.equal(engine.stops, 1);
+  assert.equal(storage.data['vibe-player:external'], 'off');
+  assert.equal($('[data-role=external-consent]').hidden, false);
+  assert.equal($('[data-role=external-list]').children.length, 0);
+  assert.equal(app.library.list().some((t) => t.source === 'external'), false);
+  assert.equal($('[data-role=title]').textContent, 'Nachtschicht');
+
+  await app.showExternal();
+  app.select('ext:demo-dawn');
+  await app.select('repo:nebelhorn', { autoplay: true });
+  click($('[data-role=external-off]'));
+  assert.equal(engine.stops, 1, 'a track from this repo keeps playing');
+  assert.equal($('[data-role=title]').textContent, 'Nebelhorn');
+});
+
+test('a link to a song from GitHub opens it when they are switched on', async () => {
+  const storage = new MemoryStorage();
+  storage.setItem('vibe-player:external', 'on');
+  dom = new JSDOM(html, { url: 'https://example.test/vibe-soundlab/#other-songs-cave' });
+  doc = dom.window.document;
+  await startWithSongs({ storage });
+  assert.equal($('[data-role=title]').textContent, 'Cave Theme');
+  assert.equal(sourceList('other').open, true);
+  await settle();
+  assert.match($('[data-role=code]').textContent, /scale/);
+
+  dom = new JSDOM(html, { url: 'https://example.test/vibe-soundlab/#other-songs-cave' });
+  doc = dom.window.document;
+  await startWithSongs();
+  assert.equal($('[data-role=title]').textContent, 'Nachtschicht', 'switched off, the link falls back to the first track');
+});
+
+test('when the list of songs does not load, the player says so and keeps working', async () => {
+  const { app } = await startWithSongs({ fetchFn: githubFetch({ index: null }) });
+  await app.showExternal();
+  assert.equal($('[data-role=status]').textContent, 'Could not load the list of songs from GitHub (500).');
+  assert.equal($('[data-role=external-list]').children.length, 0);
+  assert.equal($('[data-role=external-none]').hidden, true);
+  assert.deepEqual(names(), repoTracks.map((t) => t.title));
+});
+
+test('blocked storage does not stop the songs from GitHub', async () => {
+  const storage = {
+    getItem() {
+      throw new Error('blocked');
+    },
+    setItem() {
+      throw new Error('blocked');
+    },
+  };
+  const { app } = await startWithSongs({ storage });
+  await app.showExternal();
+  assert.deepEqual(songNames(), ['Night Bus', 'Dawn', 'Rain Jam', 'Cave Theme']);
+  app.hideExternal();
+  assert.deepEqual(songNames(), []);
+});
+
+test('describeTrack puts the credits first', () => {
+  assert.equal(describeTrack({ credits: 'By A Composer', bpm: 120, bars: 8 }), 'By A Composer · 120 BPM · 0:16');
+});

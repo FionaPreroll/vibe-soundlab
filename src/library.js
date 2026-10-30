@@ -1,6 +1,9 @@
-// The list of tracks the player can choose from: the ones shipped in the repo
-// plus the ones uploaded in this browser. Uploads are kept in local storage.
+// The list of tracks the player can choose from: the ones shipped in the repo,
+// the ones uploaded in this browser (kept in local storage) and, when switched on,
+// songs from other GitHub repositories (see sources.js), whose code loads when picked.
 import { parseHeader, titleFromFileName } from './header.js';
+import { CHANNELS } from './mixer.js';
+import { codeUrl, formatCredits, pageUrl, readSongInfo } from './sources.js';
 
 export const STORAGE_KEY = 'vibe-player:uploads';
 
@@ -13,14 +16,19 @@ const slug = (name) =>
 
 function makeTrack(source, file, code) {
   const meta = parseHeader(code);
+  // Files without a header may still name themselves the strudel.cc way: // "Title"
+  const title = meta.title || (source === 'upload' ? readSongInfo(code, file).title : titleFromFileName(file));
   return {
     id: `${source}:${slug(file)}`,
     source,
     file,
     code,
-    meta: { ...meta, title: meta.title || titleFromFileName(file) },
+    meta: { ...meta, title },
   };
 }
+
+// Songs from elsewhere don't use this repo's orbits, so the mixer just numbers them.
+const ORBIT_NAMES = CHANNELS.map(({ orbit }) => `Orbit ${orbit}`).join(', ');
 
 export class Library {
   constructor({ storage = null } = {}) {
@@ -55,6 +63,38 @@ export class Library {
     return track;
   }
 
+  /**
+   * Adds a song from another repository, as listed in sources/index.json. Its code is
+   * null until setCode() gets it; `origin` says where it comes from.
+   */
+  addExternal(source, song) {
+    const track = {
+      id: `ext:${slug(`${source.id}-${song.path}`)}`,
+      source: 'external',
+      file: song.path,
+      code: null,
+      origin: { id: source.id, name: source.name, repo: source.repo, group: song.group, url: codeUrl(source, song.path), page: pageUrl(source, song.path) },
+      meta: { title: song.title, note: song.note ?? null, credits: song.credits ? formatCredits(song.credits) : null, mixer: ORBIT_NAMES },
+    };
+    this.#put(track);
+    return track;
+  }
+
+  /** Gives a song its code once it has loaded. A header in the code adds to what is known. */
+  setCode(id, code) {
+    const track = this.get(id);
+    if (!track) return null;
+    const { title, ...header } = parseHeader(code);
+    track.code = code;
+    track.meta = { ...track.meta, ...header };
+    return track;
+  }
+
+  /** Takes all songs from other repositories off the list. */
+  removeExternal() {
+    this.tracks = this.tracks.filter((t) => t.source !== 'external');
+  }
+
   /** Removes an uploaded track. Repo tracks can't be removed. */
   remove(id) {
     const track = this.get(id);
@@ -64,13 +104,17 @@ export class Library {
     return true;
   }
 
-  /** The track `step` places after (or before, if negative) the given one, wrapping around. */
-  neighbour(id, step = 1) {
-    if (this.tracks.length === 0) return null;
-    const index = this.tracks.findIndex((t) => t.id === id);
-    if (index === -1) return this.tracks[0];
-    const n = this.tracks.length;
-    return this.tracks[(((index + step) % n) + n) % n];
+  /**
+   * The track `step` places after (or before, if negative) the given one, wrapping
+   * around, among the tracks `include` accepts.
+   */
+  neighbour(id, step = 1, include = () => true) {
+    const tracks = this.tracks.filter(include);
+    if (tracks.length === 0) return null;
+    const index = tracks.findIndex((t) => t.id === id);
+    if (index === -1) return tracks[0];
+    const n = tracks.length;
+    return tracks[(((index + step) % n) + n) % n];
   }
 
   save() {

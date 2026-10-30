@@ -30,7 +30,7 @@ jobs:
       - name: Collect the site
         run: |
           mkdir _site
-          cp -r index.html css src tracks _site/
+          cp -r index.html css src tracks sources _site/
           touch _site/.nojekyll
       - name: Push to gh-pages
         working-directory: _site

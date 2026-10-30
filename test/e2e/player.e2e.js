@@ -1,5 +1,6 @@
 // Browser smoke test: serves the site, loads Strudel from the CDN, plays every
-// repo track for a few seconds and fails on any error Strudel or the page reports.
+// repo track for a few seconds and a made-up song in place of one from GitHub,
+// and fails on any error Strudel or the page reports.
 // Needs Playwright with Chromium and network access: pnpm run e2e
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -7,7 +8,8 @@ import { createRequire } from 'node:module';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { STRUDEL_URL } from '../../src/engine.js';
+import { SOUNDFONTS_URL, STRUDEL_URL } from '../../src/engine.js';
+import { codeUrl } from '../../src/sources.js';
 import { HYDRA_URL } from '../../src/visuals.js';
 
 const require = createRequire(import.meta.url);
@@ -42,6 +44,26 @@ await page.route(`${cdnBase}**`, async (route) => {
 // Hydra the same way: its browser build from node_modules.
 const hydraFile = require.resolve('hydra-synth');
 await page.route(HYDRA_URL, async (route) => route.fulfill({ body: await readFile(hydraFile), contentType: 'text/javascript' }));
+// And the General MIDI soundfonts module.
+const fontsFile = require.resolve('@strudel/soundfonts/dist/index.mjs');
+await page.route(SOUNDFONTS_URL, async (route) => route.fulfill({ body: await readFile(fontsFile), contentType: 'text/javascript' }));
+// Songs from GitHub: every one is served as this made-up song, which uses what
+// strudel.cc has on top of Strudel (short bank names, sliders, piano(), o(), drawings).
+const SONG = `// "Made-up song" (for the browser test)
+setcpm(120 / 4)
+$: s("bd*2 [~ bd] sd").bank("tr909").o(1)._pianoroll()
+$: note("c3 e3 g3 b3").piano().gain(slider(0.6, 0, 1)).o(3)
+$: note("<c2 g1>").s("sawtooth").lpf(400).orbit(0.5).scope()
+all((x) => x.room(0.1)) // after the tracks' Hydra visuals, as on strudel.cc
+`;
+const sourceIndex = JSON.parse(await readFile(join(ROOT, 'sources/index.json'), 'utf8'));
+const songPrefixes = sourceIndex.sources.map((source) => codeUrl(source, ''));
+const githubAsks = [];
+page.on('request', (request) => {
+  const asked = request.url();
+  if (asked.endsWith('/sources/index.json') || songPrefixes.some((prefix) => asked.startsWith(prefix))) githubAsks.push(asked);
+});
+for (const prefix of songPrefixes) await page.route(`${prefix}**`, (route) => route.fulfill({ body: SONG, contentType: 'text/plain' }));
 const problems = [];
 // what the test is doing, so errors say when they happened
 let step = 'loading the page';
@@ -162,6 +184,52 @@ try {
   await page.click('[data-role=play]');
   await page.waitForFunction(() => /Playing Nachtschicht/.test(document.querySelector('[data-role=status]').textContent), null, { timeout: 30000 });
   console.log('playlist: Short → Nachtschicht');
+  await page.click('[data-role=play]');
+
+  // Songs from GitHub: nothing is asked for until they are switched on, then one plays.
+  step = 'songs from GitHub';
+  if (githubAsks.length) problems.push(`songs from GitHub: ${githubAsks[0]} was loaded before they were switched on`);
+  await page.click('[data-role=external-on]');
+  await page.waitForSelector('[data-role=external-list] .source');
+  const listed = await page.$$eval('[data-role=external-list] .song', (items) => items.length);
+  await page.click('[data-role=external-list] .source summary');
+  await page.click('[data-role=external-list] .song .pick');
+  await page.waitForFunction(() => document.querySelector('[data-role=code]').textContent.includes('Made-up song'));
+  const song = await page.textContent('[data-role=title]');
+  await page.click('[data-role=play]');
+  // Titles from GitHub have brackets and the like, so no RegExp here.
+  await page.waitForFunction(
+    (title) => {
+      const status = document.querySelector('[data-role=status]').textContent;
+      return status.startsWith(`Playing ${title}`) || status.includes('Could not');
+    },
+    song,
+    { timeout: 60000 },
+  );
+  const songStatus = await page.textContent('[data-role=status]');
+  if (!songStatus.startsWith('Playing')) problems.push(`${song}: ${songStatus}`);
+  await page.waitForTimeout(3000);
+  const sounds = await page.evaluate(async (url) => {
+    const { soundMap } = await import(url);
+    const names = Object.keys(soundMap.get());
+    return { gm: names.filter((n) => n.startsWith('gm_')).length, tr909: names.includes('tr909_bd'), zzfx: names.includes('z_sawtooth') };
+  }, STRUDEL_URL);
+  const peak = await page.evaluate(async () => {
+    const analyser = window.vibePlayer.engine.mixer().analyser('master');
+    let max = 0;
+    for (let i = 0; i < 20; i++) {
+      const data = new Float32Array(analyser.fftSize);
+      analyser.getFloatTimeDomainData(data);
+      max = Math.max(max, ...data.map(Math.abs));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    return max;
+  });
+  console.log(`songs from GitHub: ${listed} listed; ${song}: ${songStatus} · peak ${peak.toFixed(2)} · ${JSON.stringify(sounds)}`);
+  if (listed < 100) problems.push(`songs from GitHub: only ${listed} listed`);
+  if (!(peak > 0.01)) problems.push(`songs from GitHub: ${song} is silent`);
+  if (!(sounds.gm > 100 && sounds.tr909 && sounds.zzfx)) problems.push(`songs from GitHub: strudel.cc sounds missing: ${JSON.stringify(sounds)}`);
+  if (githubAsks.filter((u) => !u.endsWith('/sources/index.json')).length !== 1) problems.push(`songs from GitHub: expected one song loaded, got ${githubAsks.length - 1}`);
   await page.click('[data-role=play]');
 } finally {
   await browser.close();
