@@ -1,0 +1,267 @@
+:root {
+  --bg: #0d1117;
+  --panel: #151b24;
+  --line: #263041;
+  --text: #e6edf3;
+  --muted: #8b98a9;
+  --accent: #7cc4ff;
+  --accent-ink: #06121f;
+  --error: #ff8a80;
+  --warning: #ffcb6b;
+  --radius: 10px;
+  /* code colours */
+  --code-keyword: #c792ea;
+  --code-call: #82aaff;
+  --code-def: #ffcb6b;
+  --code-mini: #c3e88d;
+  --code-number: #f78c6c;
+  --code-string: #addb67;
+  --code-comment: #6c7a8f;
+  --code-operator: #89ddff;
+  --code-punct: #8b98a9;
+  --code-mark: #ffe08a;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f5f7fa;
+    --panel: #ffffff;
+    --line: #d8dee8;
+    --text: #18202b;
+    --muted: #5a6677;
+    --accent: #0b6bcb;
+    --accent-ink: #ffffff;
+    --error: #b3261e;
+    --warning: #8a5300;
+    --code-keyword: #8e3fbf;
+    --code-call: #1f5fd1;
+    --code-def: #9a5b00;
+    --code-mini: #2b7a1d;
+    --code-number: #b4471b;
+    --code-string: #3f7d20;
+    --code-comment: #7d8796;
+    --code-operator: #0b7f9e;
+    --code-punct: #5a6677;
+    --code-mark: #c77700;
+    color-scheme: light;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+a { color: var(--accent); }
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  grid-template-areas: "top top" "library now";
+  gap: 20px;
+}
+
+.top { grid-area: top; }
+.visuals-toggle { float: right; margin: 4px 0 0 12px; }
+.visuals-toggle[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+
+/* Hydra visuals fill the window behind the player while a track with visuals plays. */
+.visuals { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; opacity: 0; transition: opacity .8s; }
+.visuals.on { opacity: .9; }
+body:has(.visuals.on) :is(.now, .card, .track, .drop, .consent, .source, .find, .editor) { background: color-mix(in srgb, var(--panel) 80%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+body:has(.visuals.on) .top { text-shadow: 0 1px 10px var(--bg); }
+.top h1 { margin: 0; font-size: 1.6rem; letter-spacing: .01em; }
+.top h1 span { color: var(--muted); font-weight: 400; }
+.top p { margin: 4px 0 0; color: var(--muted); }
+
+.library { grid-area: library; display: flex; flex-direction: column; gap: 12px; }
+.tracks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.track { display: flex; align-items: stretch; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.track.selected { border-color: var(--accent); }
+.track .pick { flex: 1; text-align: left; background: none; border: 0; color: inherit; padding: 10px 12px; cursor: pointer; font: inherit; display: flex; flex-direction: column; min-width: 0; }
+.track .name { font-weight: 600; }
+.track .sub { color: var(--muted); font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.track.playing .name::before { content: "▶ "; color: var(--accent); }
+.track.edited .sub::before { content: "edited · "; color: var(--code-def); }
+.track.uploaded .name::after { content: " · uploaded"; color: var(--muted); font-weight: 400; font-size: .8rem; }
+.track .remove { background: none; border: 0; color: var(--muted); font-size: 1.2rem; padding: 0 12px; cursor: pointer; }
+.track .remove:hover { color: var(--error); }
+
+/* Songs from GitHub: a switch first, then one foldable list per repository. */
+.external { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.external h2 { margin: 0; font-size: 1rem; }
+.consent { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; color: var(--muted); font-size: .9rem; }
+.consent p { margin: 0 0 10px; }
+.consent .small, .browse > .small { margin-left: 0; }
+.browse { display: flex; flex-direction: column; gap: 8px; }
+.browse[hidden], .external [hidden] { display: none; }
+.find { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 7px 12px; }
+.find:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sources { display: flex; flex-direction: column; gap: 6px; }
+.source { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.source summary { display: flex; align-items: baseline; gap: 8px; padding: 10px 12px; cursor: pointer; }
+.source summary::marker { color: var(--muted); }
+.source .source-name { font-weight: 600; }
+.source .count { color: var(--muted); font-size: .85rem; }
+.source-about { margin: 0 12px 8px; color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
+.source .group { margin: 10px 12px 4px; font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.songs { list-style: none; margin: 0 0 6px; padding: 0 6px; display: flex; flex-direction: column; gap: 2px; }
+.song { border: 1px solid transparent; border-radius: 8px; }
+.song.selected { border-color: var(--accent); }
+.song .pick { width: 100%; text-align: left; background: none; border: 0; color: inherit; padding: 6px 8px; cursor: pointer; font: inherit; display: flex; flex-direction: column; min-width: 0; }
+.song .pick:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); border-radius: 7px; }
+.song .name { font-weight: 600; font-size: .92rem; }
+.song .name small { color: var(--muted); font-weight: 400; }
+.song .sub { color: var(--muted); font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.song.playing .name::before { content: "▶ "; color: var(--accent); }
+.none { margin: 0; color: var(--muted); font-size: .9rem; }
+.origin { margin: 6px 0 0; color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
+
+.drop { display: flex; flex-direction: column; gap: 2px; border: 1px dashed var(--line); border-radius: var(--radius); padding: 14px; cursor: pointer; color: var(--muted); }
+.drop strong { color: var(--text); }
+.drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.stage { grid-area: now; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.now, .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; min-width: 0; }
+.now-head { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.now h2 { margin: 0; font-size: 1.4rem; }
+.details { margin: 2px 0 0; color: var(--muted); }
+.about { margin: 12px 0 0; }
+.transport { display: flex; gap: 8px; align-items: center; }
+.transport button { font: inherit; border-radius: 999px; cursor: pointer; }
+.play { background: var(--accent); color: var(--accent-ink); border: 0; padding: 8px 22px; font-weight: 600; min-width: 92px; }
+.play:disabled { opacity: .5; cursor: default; }
+.ghost { background: none; color: var(--text); border: 1px solid var(--line); width: 36px; height: 36px; font-size: 1.2rem; line-height: 1; }
+.repeat { background: none; color: var(--muted); border: 1px solid var(--line); padding: 7px 14px; font-size: .9rem; }
+.repeat[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+/* Seek bar: the fill follows --fill, the parts of the track sit underneath. */
+.seek { margin-top: 16px; }
+.seekbar { --fill: 0%; width: 100%; margin: 0; height: 18px; background: transparent; cursor: pointer; appearance: none; -webkit-appearance: none; }
+.seekbar:disabled { cursor: default; opacity: .55; }
+.seekbar::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--accent) var(--fill), var(--line) var(--fill)); }
+.seekbar::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--accent) var(--fill), var(--line) var(--fill)); }
+.seekbar::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -4px; border-radius: 50%; background: var(--text); border: 0; }
+.seekbar::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--text); border: 0; }
+.seekbar:disabled::-webkit-slider-thumb { background: var(--muted); }
+.seekbar:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.sections { position: relative; list-style: none; margin: 6px 0 0; padding: 0; height: 26px; }
+.sections li { position: absolute; top: 0; bottom: 0; padding-right: 2px; }
+.sections .section { width: 100%; height: 100%; padding: 0 4px; border: 1px solid var(--line); border-radius: 4px; background: none; color: var(--muted); font: inherit; font-size: .72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.sections .section:hover { color: var(--text); border-color: var(--muted); }
+.sections .section.current { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+.clock { display: flex; justify-content: space-between; gap: 12px; margin: 6px 0 0; color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.clock .where { color: var(--text); }
+
+.status { min-height: 1.5em; color: var(--muted); margin: 10px 0 0; overflow-wrap: anywhere; }
+.status .error { color: var(--error); }
+.status .warning { color: var(--warning); }
+.progress { font-variant-numeric: tabular-nums; }
+
+.card-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.card-head h3 { margin: 0; font-size: 1rem; }
+.card-head .hint { margin: 0; color: var(--muted); font-size: .85rem; flex: 1; min-width: 12em; }
+.small { margin-left: auto; font: inherit; font-size: .85rem; color: var(--text); background: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.small:disabled { color: var(--muted); opacity: .5; cursor: default; }
+
+/* Mixer: one strip per orbit, then the master. Scrolls sideways on narrow screens. */
+.strips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.strip { --strip: var(--accent); flex: 1 0 62px; max-width: 92px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 4px; border-radius: 8px; background: color-mix(in srgb, var(--strip) 7%, transparent); border: 1px solid transparent; }
+.strip.master { border-color: var(--line); margin-left: 6px; }
+.strip.silent .viz, .strip.silent .fader { opacity: .45; }
+.strip .viz { width: 100%; height: 72px; display: block; }
+.fader, .band { writing-mode: vertical-lr; direction: rtl; width: 22px; height: 110px; margin: 0; accent-color: var(--strip); cursor: pointer; }
+.strip output, .eq-band output { font-size: .75rem; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 1.2em; }
+.ms { display: flex; gap: 4px; }
+.ms button { width: 24px; height: 22px; padding: 0; font: inherit; font-size: .72rem; font-weight: 700; border-radius: 4px; border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; }
+.ms .mute[aria-pressed="true"] { background: var(--error); border-color: var(--error); color: var(--accent-ink); }
+.ms .solo[aria-pressed="true"] { background: #eab308; border-color: #eab308; color: #1a1300; }
+.strip .name { width: 100%; padding: 2px 0; font: inherit; font-size: .78rem; font-weight: 600; color: var(--text); background: none; border: 0; border-bottom: 3px solid var(--strip); border-radius: 0; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.strip .name[aria-pressed="true"] { background: color-mix(in srgb, var(--strip) 22%, transparent); }
+
+/* EQ: response curve over the spectrum of the chosen channel, eight bands below. */
+.eq { --strip: var(--accent); }
+.eq-target { color: var(--muted); font-size: .9rem; }
+.eq-target select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; }
+.eq-view { width: 100%; height: 160px; display: block; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+.eq-bands { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-top: 10px; }
+.eq-band { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.eq-band .band { height: 96px; }
+.eq-band .freq { font-size: .75rem; color: var(--muted); }
+
+.source summary { cursor: pointer; color: var(--muted); }
+.source summary a { margin-left: 12px; }
+.source summary .edited { margin-left: 8px; padding: 0 8px; border-radius: 999px; font-size: .75rem; color: var(--accent-ink); background: var(--code-def); }
+.source summary .edited[hidden] { display: none; }
+.code-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.code-tools .small { margin-left: 0; }
+.code-tools .small[hidden] { display: none; }
+.code-tools [data-role=apply]:not(:disabled) { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+.code-tools .hint { margin: 0; color: var(--muted); font-size: .85rem; flex: 1; min-width: 14em; }
+
+/* The editor: a transparent textarea over the highlighted code. Both use the same
+   font, size, padding and no wrapping, so every character sits on the one under it. */
+.editor { position: relative; margin-top: 10px; overflow: hidden; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+.editor:focus-within { border-color: var(--accent); }
+.editor pre, .editor textarea { margin: 0; padding: 12px; font: inherit; letter-spacing: normal; tab-size: 2; white-space: pre; word-wrap: normal; }
+.editor code { font: inherit; }
+.editor pre { position: absolute; top: 0; left: 0; min-width: 100%; pointer-events: none; will-change: transform; }
+.editor textarea { position: relative; display: block; width: 100%; height: min(60vh, calc(var(--lines, 20) * 1.5em + 26px)); min-height: 8em; border: 0; outline: none; resize: vertical; overflow: auto; background: transparent; color: transparent; caret-color: var(--text); }
+.editor textarea::selection { color: transparent; background: color-mix(in srgb, var(--accent) 35%, transparent); }
+.editor textarea[readonly] { cursor: default; }
+/* very long code: the plain text shows until the colours catch up */
+.editor pre.stale { visibility: hidden; }
+.editor pre.stale + textarea { color: var(--text); }
+.error-line { position: absolute; left: 0; right: 0; top: calc(12px + var(--line, 0) * 1.5em); height: 1.5em; background: color-mix(in srgb, var(--error) 22%, transparent); border-left: 3px solid var(--error); }
+.error-line[hidden] { display: none; }
+.code-error { display: block; width: 100%; margin-top: 8px; padding: 6px 10px; text-align: left; font: inherit; font-size: .88rem; color: var(--error); background: color-mix(in srgb, var(--error) 10%, transparent); border: 1px solid color-mix(in srgb, var(--error) 40%, transparent); border-radius: 8px; cursor: pointer; overflow-wrap: anywhere; }
+.code-error[hidden] { display: none; }
+
+/* Syntax colours; mini-notation strings (Strudel patterns) in green. */
+.tok-keyword { color: var(--code-keyword); }
+.tok-literal, .tok-number, .tok-mini-number { color: var(--code-number); }
+.tok-def { color: var(--code-def); }
+.tok-call, .tok-method { color: var(--code-call); }
+.tok-property, .tok-name { color: var(--text); }
+.tok-string { color: var(--code-string); }
+.tok-mini-quote, .tok-mini-word { color: var(--code-mini); }
+.tok-mini-op { color: var(--code-punct); }
+.tok-operator { color: var(--code-operator); }
+.tok-comment { color: var(--code-comment); font-style: italic; }
+/* The atoms that are sounding right now, like the strudel.cc editor marks them. */
+.editor .playing { outline: 1.5px solid var(--code-mark); outline-offset: 0; border-radius: 2px; background: color-mix(in srgb, var(--code-mark) 22%, transparent); color: var(--text); }
+
+/* Guitar chords: the one sounding now, then the next ones, each with its diagram. */
+.chord-row { list-style: none; margin: 0; padding: 0 0 4px; display: flex; gap: 8px; overflow-x: auto; }
+.chord-row[hidden], .chords .none[hidden] { display: none; }
+.chord { flex: 0 0 auto; width: 104px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 6px 6px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); }
+.chord.now { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--text); }
+.chord .when { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.chord .chord-name { font-size: 1.15rem; font-weight: 700; color: var(--text); }
+.chord.now .chord-name { font-size: 1.35rem; color: var(--accent); }
+.chord .diagram { width: 88px; height: 116px; color: var(--text); }
+.chord .no-chord { height: 116px; display: flex; align-items: center; font-size: .8rem; text-align: center; }
+.diagram line { stroke: currentColor; stroke-width: 1; opacity: .55; }
+.diagram .nut { fill: currentColor; }
+.diagram .dot, .diagram .barre { fill: var(--accent); }
+.diagram .dot.root { fill: var(--code-def); }
+.diagram .open { fill: none; stroke: currentColor; stroke-width: 1.2; }
+.diagram .open.root { stroke: var(--code-def); }
+.diagram text { fill: var(--muted); font: 10px system-ui, sans-serif; }
+.diagram .mute { font-size: 11px; }
+.chords .none { margin: 0; color: var(--muted); font-size: .9rem; }
+.chords [data-role=chords-simple][aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+
+@media (max-width: 720px) {
+  .app { grid-template-columns: 1fr; grid-template-areas: "top" "now" "library"; }
+  .now, .card { padding: 14px; }
+}

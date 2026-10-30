@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vibe Soundlab Tracks</title>
+    <meta name="description" content="Drum &amp; bass written in Strudel, from atmospheric rollers to bangers. Pick a track or upload your own." />
+    <link rel="stylesheet" href="css/player.css" />
+    <!-- For @strudel/soundfonts (see src/strudel-bridge.js): it imports Strudel by package name. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "@strudel/core": "./src/strudel-bridge.js",
+          "@strudel/webaudio": "./src/strudel-bridge.js",
+          "sfumato": "./src/sfumato-stub.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <canvas class="visuals" data-role="visuals" aria-hidden="true"></canvas>
+    <main class="app" data-role="app">
+      <header class="top">
+        <button type="button" class="small visuals-toggle" data-role="visuals-toggle" aria-pressed="true" title="Hydra visuals behind the player, when the track has them">Visuals on</button>
+        <h1>Vibe Soundlab <span>Tracks</span></h1>
+        <p>Drum &amp; bass written in <a href="https://strudel.cc/" target="_blank" rel="noopener">Strudel</a>, from atmospheric rollers to bangers. Pick a track, or upload your own Strudel file.</p>
+      </header>
+
+      <section class="library" aria-label="Tracks">
+        <ul class="tracks" data-role="list"></ul>
+        <label class="drop" data-role="drop">
+          <input type="file" accept=".js,.mjs,.txt,.strudel" multiple data-role="file" />
+          <span><strong>Upload a track</strong> or drop Strudel files here</span>
+          <small>Uploads stay in this browser.</small>
+        </label>
+
+        <section class="external" aria-labelledby="external-title">
+          <h2 id="external-title">Songs from GitHub</h2>
+          <div class="consent" data-role="external-consent">
+            <p>Strudel songs that <span data-role="external-names"></span> share in their GitHub repositories, from covers to game soundtracks. They come straight from there: playing one runs its code in this page, the way strudel.cc would. Only switch them on if you trust these repositories.</p>
+            <button type="button" class="small" data-role="external-on">Show their songs</button>
+          </div>
+          <div class="browse" data-role="external-browse" hidden>
+            <input type="search" class="find" data-role="external-find" placeholder="Find a song or artist" aria-label="Find a song or artist" />
+            <div class="sources" data-role="external-list"></div>
+            <p class="none" data-role="external-none" hidden>No song matches.</p>
+            <button type="button" class="small" data-role="external-off">Hide the songs from GitHub</button>
+          </div>
+        </section>
+      </section>
+
+      <div class="stage">
+        <section class="now" aria-label="Now playing">
+          <div class="now-head">
+            <div>
+              <h2 data-role="title">No track</h2>
+              <p class="details" data-role="details"></p>
+            </div>
+            <div class="transport">
+              <button type="button" class="ghost" data-role="prev" aria-label="Previous track">‹</button>
+              <button type="button" class="play" data-role="play" aria-pressed="false" disabled>Play</button>
+              <button type="button" class="ghost" data-role="next" aria-label="Next track">›</button>
+              <button type="button" class="repeat" data-role="repeat" data-mode="off" aria-pressed="false" title="Off: stop after the last track · All: start over · One: repeat this track">Repeat off</button>
+            </div>
+          </div>
+          <p class="about" data-role="about"></p>
+          <p class="origin" data-role="origin" hidden></p>
+          <div class="seek">
+            <input type="range" class="seekbar" data-role="seek" min="0" max="1" step="1" value="0" aria-label="Position in bars" disabled />
+            <ol class="sections" data-role="sections" aria-label="Parts of the track"></ol>
+            <p class="clock">
+              <span data-role="time">0:00</span>
+              <span class="where"><span class="progress" data-role="progress"></span> <span class="section-name" data-role="section"></span></span>
+              <span data-role="length"></span>
+            </p>
+          </div>
+          <p class="status" aria-live="polite"><span data-role="status"></span></p>
+        </section>
+
+        <section class="card chords" data-role="chords" aria-labelledby="chords-title">
+          <div class="card-head">
+            <h3 id="chords-title">Guitar chords</h3>
+            <p class="hint" data-role="chords-hint">To play along in standard tuning (E A D G B E), worked out from the notes that play.</p>
+            <button type="button" class="small" data-role="chords-simple" aria-pressed="false" title="Only the basic chord (Fm instead of Fm9), easier to play">Simple chords</button>
+          </div>
+          <ol class="chord-row" data-role="chord-row" hidden></ol>
+          <p class="none" data-role="chords-none">The chords show up here while a track plays.</p>
+        </section>
+
+        <section class="card mixer" data-role="mixer" aria-labelledby="mixer-title">
+          <div class="card-head">
+            <h3 id="mixer-title">Mixer</h3>
+            <p class="hint">One channel per orbit. Click a name to see it in the EQ.</p>
+            <button type="button" class="small" data-role="mix-reset">Reset</button>
+          </div>
+          <div class="strips" data-role="strips"></div>
+        </section>
+
+        <section class="card eq" data-role="eq" aria-labelledby="eq-title">
+          <div class="card-head">
+            <h3 id="eq-title">EQ</h3>
+            <label class="eq-target">on <select data-role="eq-target"></select></label>
+            <button type="button" class="small" data-role="eq-flat">Flat</button>
+          </div>
+          <canvas class="eq-view" data-role="eq-view" width="640" height="160" aria-hidden="true"></canvas>
+          <div class="eq-bands" data-role="eq-bands"></div>
+        </section>
+
+        <details class="card source" open>
+          <summary>Code <span class="edited" data-role="edited" hidden>edited</span> <a data-role="open" href="https://strudel.cc/" target="_blank" rel="noopener">Open in strudel.cc</a></summary>
+          <div class="code-tools">
+            <button type="button" class="small" data-role="apply" disabled title="Ctrl+Enter (⌘+Enter on a Mac)">Update</button>
+            <button type="button" class="small" data-role="revert" hidden>Undo my changes</button>
+            <p class="hint" data-role="code-hint">Change the code while it plays, then press Update or Ctrl+Enter. Ctrl+. stops.</p>
+          </div>
+          <div class="editor">
+            <pre class="code-layer" data-role="code-layer" aria-hidden="true"><span class="error-line" data-role="error-line" hidden></span><code data-role="code"></code></pre>
+            <textarea class="code-input" data-role="code-input" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-label="Strudel code of the track"></textarea>
+          </div>
+          <button type="button" class="code-error" data-role="code-error" hidden></button>
+        </details>
+      </div>
+    </main>
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>

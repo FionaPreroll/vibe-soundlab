@@ -1,0 +1,140 @@
+{
+  "tracks": [
+    {
+      "file": "nachtschicht.js",
+      "title": "Nachtschicht",
+      "style": "Dark techstep",
+      "bpm": 174,
+      "key": "F minor",
+      "bars": 120,
+      "order": 1,
+      "about": "Driving reese in the style of Dom & Roland, over a breathing pad on an F pedal."
+    },
+    {
+      "file": "nebelhorn.js",
+      "title": "Nebelhorn",
+      "style": "Deep roller",
+      "bpm": 174,
+      "key": "E minor",
+      "bars": 112,
+      "order": 2,
+      "about": "A distorted foghorn bass calls across a rolling beat and a cold, wide pad."
+    },
+    {
+      "file": "glasregen.js",
+      "title": "Glasregen",
+      "style": "Liquid / atmospheric",
+      "bpm": 172,
+      "key": "C minor",
+      "bars": 128,
+      "order": 3,
+      "about": "Two-step liquid roller: glassy FM keys, a bell melody and rain made of glass taps."
+    },
+    {
+      "file": "polarlicht.js",
+      "title": "Polarlicht",
+      "style": "Ambient jungle",
+      "bpm": 170,
+      "key": "D minor",
+      "bars": 128,
+      "order": 4,
+      "about": "Chopped amen and a deep 808 sub under a choir pad, with a halftime breakdown."
+    },
+    {
+      "file": "druckwelle.js",
+      "title": "Druckwelle",
+      "style": "Dancefloor roller",
+      "bpm": 174,
+      "key": "G minor",
+      "bars": 128,
+      "order": 5,
+      "about": "A loud, overdriven foghorn bass rolls under a supersaw hook made for the dancefloor."
+    },
+    {
+      "file": "kernschmelze.js",
+      "title": "Kernschmelze",
+      "style": "Neurofunk",
+      "bpm": 174,
+      "key": "F# minor",
+      "bars": 120,
+      "order": 6,
+      "about": "A talking, wavefolded bass on an F sharp pedal, tight drums, metal stabs and lasers."
+    },
+    {
+      "file": "starkstrom.js",
+      "title": "Starkstrom",
+      "style": "Jump-up",
+      "bpm": 175,
+      "key": "A minor",
+      "bars": 120,
+      "order": 7,
+      "about": "A bouncing wub bass full of pitch bends, a hoover riff and air horns on the drop."
+    },
+    {
+      "file": "tiefgarage.js",
+      "title": "Tiefgarage",
+      "style": "808 roller",
+      "bpm": 172,
+      "key": "Bb minor",
+      "bars": 128,
+      "order": 8,
+      "about": "A sliding 808 and a fat, subby Reese roll as one bass through a dark, dripping car park."
+    },
+    {
+      "file": "schwerkraft.js",
+      "title": "Schwerkraft",
+      "style": "Reese roller",
+      "bpm": 174,
+      "key": "C# minor",
+      "bars": 120,
+      "order": 9,
+      "about": "A huge, slowly beating Reese rolls between heavy 808 booms that land every two bars."
+    },
+    {
+      "file": "unterstroemung.js",
+      "title": "Unterströmung",
+      "style": "Steppy roller",
+      "bpm": 175,
+      "key": "G# minor",
+      "bars": 120,
+      "order": 10,
+      "about": "An 808 boom on every kick, a subby Reese rolling in the gaps, warm keys and chopped amens."
+    },
+    {
+      "file": "seriennummer.js",
+      "title": "Seriennummer",
+      "style": "Keygen chiptune",
+      "bpm": 140,
+      "key": "A minor",
+      "bars": 88,
+      "order": 11,
+      "channels": "6",
+      "mixer": "Kick + snare, Bass, Arpeggio, Hats, Echo, Lead",
+      "about": "A keygen anthem in FastTracker style: six channels, shimmering arpeggios, a heroic lead and its echo."
+    },
+    {
+      "file": "rasterzeile.js",
+      "title": "Rasterzeile",
+      "style": "C64 SID chiptune",
+      "bpm": 150,
+      "key": "B minor",
+      "bars": 88,
+      "order": 12,
+      "channels": "3",
+      "mixer": ", Bass + drums, Arpeggio, , , Lead",
+      "about": "Three voices like the C64's SID chip: a PWM lead, a fast arpeggio, and one voice for bass and drums together."
+    },
+    {
+      "file": "sternenfeld.js",
+      "title": "Sternenfeld",
+      "style": "Amiga demoscene chiptune",
+      "bpm": 125,
+      "key": "D major",
+      "bars": 80,
+      "order": 13,
+      "channels": "4",
+      "mixer": "Drums + echo, Bass, Arpeggio, , , Lead",
+      "about": "A cheerful Amiga intro tune on four channels panned left-right-right-left, the drum channel turns into an echo in the break."
+    }
+  ]
+}
