@@ -16,7 +16,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # installs the pnpm version pinned in package.json ("packageManager")
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm test
+      - run: pnpm install --frozen-lockfile
+      # the tests, with a coverage report of js/ in lcov.info
+      - run: pnpm run coverage
+      # Codecov takes uploads from this public repo without a token; CODECOV_TOKEN is
+      # used if the secret exists. A failed upload does not fail CI.
+      - uses: codecov/codecov-action@v7
+        with:
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}

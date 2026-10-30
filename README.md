@@ -16,7 +16,7 @@ straight over to those synths.
 No build step and no dependencies. Serve the folder and open it in a browser:
 
 ```sh
-npm start        # python3 -m http.server 8000
+pnpm start        # python3 -m http.server 8000
 # then open http://localhost:8000
 ```
 
@@ -24,9 +24,16 @@ Opening `index.html` straight from disk does not work, because browsers block ES
 
 ## Tests
 
+The project uses [pnpm](https://pnpm.io/installation); `package.json` pins its version
+(`packageManager`).
+
 ```sh
-npm test         # node --test, needs Node 18+
+pnpm test         # node --test, needs Node 18+
+pnpm run coverage # the same with a coverage report of js/ in lcov.info, needs Node 22
 ```
+
+CI uploads `lcov.info` to [Codecov](https://app.codecov.io/gh/FionaPreroll/vibe-soundlab/tree/soundlab).
+Codecov only reports and never fails a pull request (`codecov.yml`).
 
 ## Layout
 
