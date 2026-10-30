@@ -5,6 +5,7 @@
 // @bars 80
 // @order 13
 // @channels 4
+// @mixer Drums + echo, Bass, Arpeggio, , , Lead
 // @about A cheerful Amiga intro tune on four channels panned left-right-right-left, the drum channel turns into an echo in the break.
 // ============================================================
 //  STERNENFELD — Amiga-Chiptune · 125 BPM · D-Dur · 4 Kanäle

@@ -5,6 +5,7 @@
 // @bars 88
 // @order 11
 // @channels 6
+// @mixer Kick + snare, Bass, Arpeggio, Hats, Echo, Lead
 // @about A keygen anthem in FastTracker style: six channels, shimmering arpeggios, a heroic lead and its echo.
 // ============================================================
 //  SERIENNUMMER — Keygen-Chiptune · 140 BPM · A-Moll · 6 Kanäle

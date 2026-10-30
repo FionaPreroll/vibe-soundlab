@@ -5,6 +5,7 @@
 // @bars 88
 // @order 12
 // @channels 3
+// @mixer , Bass + drums, Arpeggio, , , Lead
 // @about Three voices like the C64's SID chip: a PWM lead, a fast arpeggio, and one voice for bass and drums together.
 // ============================================================
 //  RASTERZEILE — C64-Chiptune · 150 BPM · H-Moll · 3 Stimmen
