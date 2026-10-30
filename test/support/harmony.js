@@ -45,17 +45,18 @@ export function overLayerClashes(haps) {
 /**
  * On every bar's downbeat the bass note must be a chord tone, and no chord tone
  * may sit a semitone above it (a minor ninth against the bass, the harshest clash).
+ * The chord is the pad's unless `chordAt` says otherwise (chiptunes use the arpeggio).
  */
-export function bassClashes(haps) {
+export function bassClashes(haps, chordAt = (t) => padChordAt(haps, t)) {
   const problems = [];
   for (const h of haps) {
     if (orbitOf(h) !== ORBIT.bass || !pitched(h) || !h.hasOnset()) continue;
     const t = at(h);
     if (!Number.isInteger(t)) continue;
-    const chord = padChordAt(haps, t);
+    const chord = chordAt(t);
     if (chord.size === 0) continue;
     const note = pc(toMidi(h.value.note));
-    if (!chord.has(note)) problems.push(`bar ${t + 1}: bass ${h.value.note} is not in the pad chord (${describe(chord)})`);
+    if (!chord.has(note)) problems.push(`bar ${t + 1}: bass ${h.value.note} is not in the chord (${describe(chord)})`);
     else if (chord.has((note + 1) % 12)) problems.push(`bar ${t + 1}: bass ${h.value.note} has ${name((note + 1) % 12)} a semitone above it`);
   }
   return [...new Set(problems)];
