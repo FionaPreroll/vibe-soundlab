@@ -4,6 +4,7 @@ import { loadCatalog } from './catalog.js';
 import { durationSeconds, formatDuration } from './header.js';
 import { renderCode } from './highlight.js';
 import { Library } from './library.js';
+import { channelNames } from './mixer.js';
 import { createMixerPanel } from './mixer-panel.js';
 import { REPEAT_LABELS, hasEnded, nextRepeatMode, parseRepeatMode, trackAfter } from './playlist.js';
 import { parseSections, sectionAt } from './sections.js';
@@ -198,6 +199,8 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   function render() {
     renderList();
     renderNow();
+    // The mixer names the channels of the track that plays, or else of the one selected.
+    mixer.setNames(channelNames(library.get(state.playing ?? state.selected)?.meta.mixer));
   }
 
   function select(id, { autoplay = false } = {}) {

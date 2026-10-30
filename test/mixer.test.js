@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   CHANNELS,
+  MAX_NAME_LENGTH,
+  channelNames,
   EQ_BANDS,
   FADER_MIN_DB,
   channelGain,
@@ -25,6 +27,15 @@ test('one channel per orbit the tracks use, and eight EQ bands', () => {
   assert.deepEqual(mix.channels[3], { gain: 0, mute: false, solo: false, eq: [0, 0, 0, 0, 0, 0, 0, 0] });
   assert.deepEqual(mix.master, { gain: 0, eq: [0, 0, 0, 0, 0, 0, 0, 0] });
   assert.ok(isDefaultMix(mix));
+});
+
+test('tracks can name their channels in the header', () => {
+  assert.deepEqual(channelNames(), { 1: 'Drums', 2: 'Bass', 3: 'Pad', 4: 'Snare', 5: 'Stabs', 6: 'Leads', 7: 'FX', 8: 'Orbit 8' });
+  const names = channelNames(' Noise ,Bass, Arpeggio,, Echo');
+  assert.deepEqual([names[1], names[2], names[3], names[4], names[5], names[6]], ['Noise', 'Bass', 'Arpeggio', 'Snare', 'Echo', 'Leads']);
+  assert.equal(channelNames('A Very Long Channel Name')[1].length, MAX_NAME_LENGTH);
+  assert.equal(channelNames('1,2,3,4,5,6,7,8,9,10')[8], '8', 'names past orbit 8 are ignored');
+  assert.equal(channelNames(42)[1], 'Drums');
 });
 
 test('stored settings are checked and clamped', () => {
