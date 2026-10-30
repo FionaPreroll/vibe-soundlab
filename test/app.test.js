@@ -48,6 +48,8 @@ function fakeEngine({ failInit = false } = {}) {
       return true;
     },
     position: () => engine.pos,
+    mixer: () => null,
+    isPlaying: () => engine.pos !== null,
   };
   return engine;
 }
@@ -568,4 +570,20 @@ test('with nothing selected the clock rests at zero', async () => {
   assert.equal($('[data-role=time]').textContent, '0:00');
   assert.equal(seekBar().disabled, true);
   assert.equal(seekBar().getAttribute('aria-valuetext'), 'Unknown length');
+});
+
+test('every animation frame redraws the mixer', async () => {
+  const drawn = [];
+  dom.window.HTMLCanvasElement.prototype.getContext = () => ({
+    clearRect: () => drawn.push('clear'),
+    fillRect() {},
+    beginPath() {},
+    moveTo() {},
+    lineTo() {},
+    stroke() {},
+  });
+  const { app } = await start();
+  app.drawFrame(1000);
+  assert.equal(drawn.length, 10, 'nine strips and the EQ view');
+  assert.equal(app.mixer.eqTarget(), 'master');
 });

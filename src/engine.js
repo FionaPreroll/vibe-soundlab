@@ -1,5 +1,6 @@
 // Plays Strudel code in the browser through @strudel/web.
 // The Strudel version here must match the one the tests run against (package.json).
+import { createMixerGraph } from './mixer-graph.js';
 
 export const STRUDEL_VERSION = '1.2.6';
 export const STRUDEL_URL = `https://cdn.jsdelivr.net/npm/@strudel/web@${STRUDEL_VERSION}/dist/index.mjs`;
@@ -17,14 +18,21 @@ export const SAMPLE_MAPS = [
 // Orbits the tracks use (see the README). Seeking creates them up front.
 export const ORBITS = 8;
 
-export function createEngine({ load = () => import(STRUDEL_URL) } = {}) {
+/**
+ * `createGraph` builds the mixer between Strudel and the speakers (null plays
+ * without one); `later` runs a callback after a delay in ms.
+ */
+export function createEngine({ load = () => import(STRUDEL_URL), createGraph = createMixerGraph, later = setTimeout } = {}) {
   let strudel = null;
   let repl = null;
   let ready = null;
   let evalError = null;
   let playing = false;
+  let graph = null;
   // After a jump, the bar it went to, until the scheduler has caught up with it.
   let seekFloor = null;
+  // Counts plays and stops, so a jump that was waiting for its fade can tell it is stale.
+  let generation = 0;
 
   function init() {
     ready ??= (async () => {
@@ -34,6 +42,14 @@ export function createEngine({ load = () => import(STRUDEL_URL) } = {}) {
         onEvalError: (err) => {
           evalError = err;
         },
+        // With the mixer, every orbit gets its own pair of channels. Strudel resets
+        // this setting when it starts its audio, so it is set again for each note.
+        ...(createGraph && {
+          defaultOutput: (...args) => {
+            strudel.setMultiChannelOrbits(true);
+            return strudel.webaudioOutput(...args);
+          },
+        }),
       });
     })().catch((err) => {
       ready = null;
@@ -56,13 +72,32 @@ export function createEngine({ load = () => import(STRUDEL_URL) } = {}) {
     return run;
   }
 
+  // Puts the mixer between Strudel and the speakers: Strudel sends to whatever
+  // its audio context calls the destination, so that name now points at the mixer.
+  function attachMixer() {
+    if (graph || !createGraph) return;
+    try {
+      const ctx = strudel.getAudioContext();
+      graph = createGraph(ctx, ctx.destination);
+      Object.defineProperty(ctx, 'destination', { value: graph.input, configurable: true });
+      // Rebuilds Strudel's output, which reads the destination again.
+      strudel.resetGlobalEffects();
+    } catch (err) {
+      graph = null;
+      console.warn('Playing without the mixer:', err?.message ?? err);
+    }
+  }
+
   async function playNow(code, from) {
     await init();
     await strudel.getAudioContext?.().resume?.();
+    attachMixer();
     evalError = null;
     // Stopping first resets the clock, so every track starts at bar 1
     // instead of wherever the previous one was.
     if (playing) strudel.hush();
+    generation++;
+    graph?.fadeIn(0);
     const pattern = await strudel.evaluate(code);
     if (evalError || !pattern) {
       playing = false;
@@ -77,6 +112,7 @@ export function createEngine({ load = () => import(STRUDEL_URL) } = {}) {
     if (strudel) strudel.hush();
     playing = false;
     seekFloor = null;
+    generation++;
   }
 
   // Every orbit a track may duck has to exist before the first kick asks for it,
@@ -84,6 +120,7 @@ export function createEngine({ load = () => import(STRUDEL_URL) } = {}) {
   // Strudel drops notes scheduled in the past without creating their orbit, and on a busy
   // machine the clock moves on while these are set up, so they start well ahead.
   function createOrbits() {
+    if (graph) strudel.setMultiChannelOrbits(true);
     for (let orbit = 1; orbit <= ORBITS; orbit++) {
       const at = strudel.getAudioContext().currentTime + 0.5;
       Promise.resolve(strudel.superdough({ s: 'sine', gain: 0, orbit }, at, 0.01)).catch(() => {});
@@ -98,15 +135,27 @@ export function createEngine({ load = () => import(STRUDEL_URL) } = {}) {
     const scheduler = repl?.scheduler;
     if (!playing || !scheduler || !('lastEnd' in scheduler)) return false;
     const target = Math.max(0, Math.floor(bar));
-    // Notes already started hang off Strudel's current output. Resetting it
-    // drops them (and their reverb tails) at once.
-    strudel.resetGlobalEffects();
-    createOrbits();
-    // The scheduler starts its next query at lastEnd. With the tick count at zero,
-    // that tick also becomes the new reference for timing, as after a tempo change.
-    scheduler.lastEnd = target;
-    scheduler.num_ticks_since_cps_change = 0;
     seekFloor = target;
+    const mine = generation;
+    const jump = () => {
+      if (mine !== generation) return;
+      // Notes already started hang off Strudel's current output. Resetting it
+      // drops them (and their reverb tails) at once.
+      strudel.resetGlobalEffects();
+      createOrbits();
+      // The scheduler starts its next query at lastEnd. With the tick count at zero,
+      // that tick also becomes the new reference for timing, as after a tempo change.
+      scheduler.lastEnd = target;
+      scheduler.num_ticks_since_cps_change = 0;
+      graph?.fadeIn(0.15);
+    };
+    if (!graph) {
+      jump();
+      return true;
+    }
+    // With the mixer, a quick fade first, so cutting the old notes doesn't click.
+    graph.fadeOut();
+    later(jump, 25);
     return true;
   }
 
@@ -122,5 +171,5 @@ export function createEngine({ load = () => import(STRUDEL_URL) } = {}) {
     return now;
   }
 
-  return { init, play, stop, seek, position, isPlaying: () => playing };
+  return { init, play, stop, seek, position, isPlaying: () => playing, mixer: () => graph };
 }

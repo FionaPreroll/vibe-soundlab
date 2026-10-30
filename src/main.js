@@ -21,4 +21,9 @@ const app = await createApp({
   location: window.location,
 });
 setInterval(() => app.updateProgress(), 100);
+const frame = (now) => {
+  app.drawFrame(now);
+  requestAnimationFrame(frame);
+};
+requestAnimationFrame(frame);
 window.vibePlayer = app;

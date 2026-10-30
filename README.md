@@ -11,6 +11,13 @@ The repeat button switches between off (stop after the last track), all (start o
 The progress bar shows the parts of the track (intro, build, drops, …) as the final `arrange(...)`
 lists them; click or drag it, or click a part, to jump there.
 
+The mixer has one channel per orbit (see the table below) and a master, each with a fader, mute,
+solo and a live spectrum with a level meter. The 8-band EQ (shelves at 40 Hz and 14 kHz, bells at
+100, 250, 600, 1.5k, 3.5k and 8k) works on the master or on any one channel; its curve is drawn
+over that channel's live spectrum. Mixer and EQ settings stay in the browser.
+To get there, the player tells Strudel to give every orbit its own pair of output channels
+(multi-channel orbits) and splits them back up in its own Web Audio graph (`src/mixer-graph.js`).
+
 The live player: https://fionapreroll.github.io/vibe-soundlab/
 
 > The sound design lessons (the foghorn lesson app) live on the
@@ -52,7 +59,8 @@ The header looks like this:
 ```
 
 Layers use fixed orbits. Reverb size and delay settings belong to an orbit, so two layers
-with different settings on one orbit keep overwriting each other.
+with different settings on one orbit keep overwriting each other. Each orbit is also one channel
+in the player's mixer.
 
 | Orbit | Layer |
 | --- | --- |
@@ -114,6 +122,6 @@ every event of the whole arrangement:
 | --- | --- |
 | `tracks/` | the Strudel tracks and `index.json` |
 | `index.html`, `css/` | the player page |
-| `src/` | player code: engine (Strudel, seeking), library (repo tracks and uploads), playlist and repeat rules, track parts for the progress bar, upload checks, header parsing, strudel.cc links |
+| `src/` | player code: engine (Strudel, seeking), library (repo tracks and uploads), playlist and repeat rules, track parts for the progress bar, mixer (settings, audio graph, EQ math, meters, panel), upload checks, header parsing, strudel.cc links |
 | `scripts/` | `index-tracks.js` (track index), `snapshot-samples.js` (sample names for the tests) |
 | `test/` | tests; `test/support/` runs Strudel in Node and holds the harmony checks |

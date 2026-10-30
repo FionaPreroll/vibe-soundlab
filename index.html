@@ -23,35 +23,57 @@
         </label>
       </section>
 
-      <section class="now" aria-label="Now playing">
-        <div class="now-head">
-          <div>
-            <h2 data-role="title">No track</h2>
-            <p class="details" data-role="details"></p>
+      <div class="stage">
+        <section class="now" aria-label="Now playing">
+          <div class="now-head">
+            <div>
+              <h2 data-role="title">No track</h2>
+              <p class="details" data-role="details"></p>
+            </div>
+            <div class="transport">
+              <button type="button" class="ghost" data-role="prev" aria-label="Previous track">‹</button>
+              <button type="button" class="play" data-role="play" aria-pressed="false" disabled>Play</button>
+              <button type="button" class="ghost" data-role="next" aria-label="Next track">›</button>
+              <button type="button" class="repeat" data-role="repeat" data-mode="off" aria-pressed="false" title="Off: stop after the last track · All: start over · One: repeat this track">Repeat off</button>
+            </div>
           </div>
-          <div class="transport">
-            <button type="button" class="ghost" data-role="prev" aria-label="Previous track">‹</button>
-            <button type="button" class="play" data-role="play" aria-pressed="false" disabled>Play</button>
-            <button type="button" class="ghost" data-role="next" aria-label="Next track">›</button>
-            <button type="button" class="repeat" data-role="repeat" data-mode="off" aria-pressed="false" title="Off: stop after the last track · All: start over · One: repeat this track">Repeat off</button>
+          <p class="about" data-role="about"></p>
+          <div class="seek">
+            <input type="range" class="seekbar" data-role="seek" min="0" max="1" step="1" value="0" aria-label="Position in bars" disabled />
+            <ol class="sections" data-role="sections" aria-label="Parts of the track"></ol>
+            <p class="clock">
+              <span data-role="time">0:00</span>
+              <span class="where"><span class="progress" data-role="progress"></span> <span class="section-name" data-role="section"></span></span>
+              <span data-role="length"></span>
+            </p>
           </div>
-        </div>
-        <p class="about" data-role="about"></p>
-        <div class="seek">
-          <input type="range" class="seekbar" data-role="seek" min="0" max="1" step="1" value="0" aria-label="Position in bars" disabled />
-          <ol class="sections" data-role="sections" aria-label="Parts of the track"></ol>
-          <p class="clock">
-            <span data-role="time">0:00</span>
-            <span class="where"><span class="progress" data-role="progress"></span> <span class="section-name" data-role="section"></span></span>
-            <span data-role="length"></span>
-          </p>
-        </div>
-        <p class="status" aria-live="polite"><span data-role="status"></span></p>
-        <details class="source">
+          <p class="status" aria-live="polite"><span data-role="status"></span></p>
+        </section>
+
+        <section class="card mixer" data-role="mixer" aria-labelledby="mixer-title">
+          <div class="card-head">
+            <h3 id="mixer-title">Mixer</h3>
+            <p class="hint">One channel per orbit. Click a name to see it in the EQ.</p>
+            <button type="button" class="small" data-role="mix-reset">Reset</button>
+          </div>
+          <div class="strips" data-role="strips"></div>
+        </section>
+
+        <section class="card eq" data-role="eq" aria-labelledby="eq-title">
+          <div class="card-head">
+            <h3 id="eq-title">EQ</h3>
+            <label class="eq-target">on <select data-role="eq-target"></select></label>
+            <button type="button" class="small" data-role="eq-flat">Flat</button>
+          </div>
+          <canvas class="eq-view" data-role="eq-view" width="640" height="160" aria-hidden="true"></canvas>
+          <div class="eq-bands" data-role="eq-bands"></div>
+        </section>
+
+        <details class="card source">
           <summary>Code <a data-role="open" href="https://strudel.cc/" target="_blank" rel="noopener">Open in strudel.cc</a></summary>
           <pre><code data-role="code"></code></pre>
         </details>
-      </section>
+      </div>
     </main>
     <script type="module" src="src/main.js"></script>
   </body>

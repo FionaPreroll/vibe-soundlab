@@ -95,6 +95,31 @@ try {
     if (!(at >= bar + 1 && at <= bar + 5)) problems.push(`seek to bar ${bar + 1}: now at ${progress}`);
   };
   await jump(24);
+
+  // Mixer: in the drop, drums and bass reach their own strips; muting the bass silences its strip.
+  step = 'mixer';
+  const levels = () =>
+    page.evaluate(() => {
+      const graph = window.vibePlayer.engine.mixer();
+      if (!graph) return null;
+      const peak = (target) => {
+        const analyser = graph.analyser(target);
+        const data = new Float32Array(analyser.fftSize);
+        analyser.getFloatTimeDomainData(data);
+        return Math.max(...data.map(Math.abs));
+      };
+      return Object.fromEntries(['master', 1, 2, 3].map((t) => [t, peak(t)]));
+    });
+  const loud = await levels();
+  console.log(`mixer peaks: ${JSON.stringify(loud)}`);
+  if (!loud) problems.push('mixer: no audio graph');
+  else if (!(loud[1] > 0.01 && loud[2] > 0.01 && loud.master > 0.01)) problems.push(`mixer: expected drums, bass and master to play, got ${JSON.stringify(loud)}`);
+  await page.click('.strip[data-target="2"] .mute');
+  await page.waitForTimeout(600);
+  const muted = await levels();
+  if (!(muted?.[2] < 0.001 && muted?.[1] > 0.01)) problems.push(`mixer: muting the bass should silence only it, got ${JSON.stringify(muted)}`);
+  await page.click('.strip[data-target="2"] .mute');
+
   await jump(8);
 
   // Playlist: a two-bar upload at the end of the list, repeat all → Nachtschicht follows it.
