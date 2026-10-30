@@ -35,9 +35,9 @@ osc(18, .03, .4).brightness(() => -.5 + energy() * .2).out()
 
 `H(pattern)` turns a Strudel pattern into a number Hydra reads every frame, at the bar the music
 is at. The tracks use one `energy` pattern that follows their own arrangement (low in the intro,
-rising in the builds, 1 in the drops) and one `pulse` on the beat. The player loads Hydra from
-jsDelivr (`hydra-synth`, pinned in `src/visuals.js`) the first time a track asks for it; if it
-can't, the track plays without visuals.
+rising in the builds, 1 in the drops or choruses) and one `pulse` on the beat. The player loads
+Hydra from jsDelivr (`hydra-synth`, pinned in `src/visuals.js`) the first time a track asks for
+it; if it can't, the track plays without visuals.
 
 The live player: https://fionapreroll.github.io/vibe-soundlab/
 
@@ -163,7 +163,8 @@ every event of the whole arrangement. For every track:
 - only breaks that are exactly one bar long get stretched onto a bar with `fit()`;
 - every sound and sample number exists, every bar plays something, levels stay sane;
 - the Hydra visuals use only functions Hydra has (`test/support/hydra.js` checks them against
-  the pinned `hydra-synth`), and one `H()` pattern is 1 exactly in the drops.
+  the pinned `hydra-synth`), and one `H()` pattern is 1 exactly in the drops (choruses in the
+  chiptunes).
 
 For the drum & bass tracks:
 

@@ -142,7 +142,7 @@ for (const file of files) {
       assert.deepEqual(earlyDucks(haps), []);
     });
 
-    test('has Hydra visuals that light up in the drops', async () => {
+    test('has Hydra visuals that peak in the drops or choruses', async () => {
       const { code, meta, visuals } = await analyseTrack(file);
       assert.equal(visuals.inits, 1, 'calls initHydra() once');
       assert.ok(visuals.outputs.length > 0, 'sends a picture to an output with .out()');
@@ -156,10 +156,12 @@ for (const file of files) {
           assert.ok(Number.isFinite(value) && value >= 0 && value <= 1, `H() gives ${value} at bar ${t}`);
         }
       }
-      const inDrop = (t) => sectionAt(sections, t)?.name.startsWith('drop') ?? false;
+      // the loudest parts: drops in drum & bass, choruses in the chiptunes
+      const atPeak = (t) => /^(drop|chorus)/.test(sectionAt(sections, t)?.name ?? '');
+      assert.ok(times.some(atPeak), 'the arrangement has drops or choruses');
       assert.ok(
-        visuals.patterns.some((p) => times.every((t) => (valueAt(p, t) === 1) === inDrop(t))),
-        'one H() pattern is 1 in the drops and lower everywhere else',
+        visuals.patterns.some((p) => times.every((t) => (valueAt(p, t) === 1) === atPeak(t))),
+        'one H() pattern is 1 in the drops or choruses and lower everywhere else',
       );
     });
 
