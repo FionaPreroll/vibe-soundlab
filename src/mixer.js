@@ -13,6 +13,18 @@ export const CHANNELS = [
   { orbit: 8, name: 'Orbit 8' },
 ];
 
+export const MAX_NAME_LENGTH = 14;
+
+/**
+ * Channel names for a track. Tracks that use their orbits differently name them in
+ * their header, in orbit order: `// @mixer Drums, Bass, Arpeggio`. Empty or missing
+ * entries keep the default name. Returns { orbit: name } for every channel.
+ */
+export function channelNames(spec = '') {
+  const given = typeof spec === 'string' ? spec.split(',').map((name) => name.trim().slice(0, MAX_NAME_LENGTH).trim()) : [];
+  return Object.fromEntries(CHANNELS.map(({ orbit, name }, i) => [orbit, given[i] || name]));
+}
+
 // Shelves at both ends, bells in between, spaced for drum & bass:
 // sub, bass, mud, body, bite, presence, sizzle, air.
 export const EQ_BANDS = [

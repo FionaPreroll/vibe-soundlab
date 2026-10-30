@@ -77,6 +77,14 @@ in the player's mixer.
 | 6 | arps, plucks, leads |
 | 7 | FX and atmosphere |
 
+The mixer names its channels after this table (Drums, Bass, Pad, Snare, Stabs, Leads, FX). A track
+that uses its orbits differently names them in an optional header line, in orbit order; an empty
+entry keeps the default name:
+
+```js
+// @mixer Drums, Bass, Arpeggio, Drums 2, Echo, Lead
+```
+
 After adding or renaming a track, run `pnpm run tracks` to update `tracks/index.json`.
 
 ## Run it
