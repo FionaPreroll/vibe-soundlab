@@ -43,13 +43,17 @@ const loadHydra = async (win) => {
 /**
  * `canvas` is drawn on full screen, at `scale` of the window size (Hydra's
  * shaders are soft, so half resolution saves a lot of work). `now()` returns the
- * music's position in bars, or null when nothing plays.
+ * music's position in bars, or null when nothing plays. `onError(error)` hears when
+ * the track's visuals throw while drawing; they stop until the code runs again.
  */
-export function createVisuals({ canvas, now = () => null, load = loadHydra, scale = 0.5 }) {
+export function createVisuals({ canvas, now = () => null, load = loadHydra, scale = 0.5, onError = () => {} }) {
   const win = canvas.ownerDocument.defaultView;
   let hydra = null;
   let starting = null;
   let used = false; // the current track called initHydra()
+  let usedBefore = false; // and the code that ran before it, in case the new code fails
+  let broken = false; // the visuals threw while drawing
+  let brokenBefore = false;
   let running = false; // the current track is playing
   let enabled = true;
   let frame = null;
@@ -100,12 +104,20 @@ export function createVisuals({ canvas, now = () => null, load = loadHydra, scal
     frame = win.requestAnimationFrame(tick);
     const dt = last ? Math.min(100, time - last) : 16;
     last = time;
-    hydra.tick(dt);
+    try {
+      hydra.tick(dt);
+    } catch (err) {
+      // A mistake in the visuals (a misspelled name in a function Hydra calls every
+      // frame) would throw sixty times a second. They stop instead; the music plays on.
+      broken = true;
+      update();
+      onError(err);
+    }
   }
 
   // Shows the canvas and runs Hydra only while a track with visuals plays.
   function update() {
-    const visible = enabled && running && used && hydra !== null;
+    const visible = enabled && running && used && !broken && hydra !== null;
     canvas.classList.toggle('on', visible);
     if (visible && frame === null) {
       last = 0;
@@ -125,14 +137,27 @@ export function createVisuals({ canvas, now = () => null, load = loadHydra, scal
   return {
     initHydra,
     H,
-    /** Before a track's code runs: forget the last track's visuals. */
-    beforeRun() {
+    /**
+     * Before a track's code runs: forget the last track's visuals. For code changed
+     * while it plays (`fresh: false`) they keep running until the new code replaces them.
+     */
+    beforeRun({ fresh = true } = {}) {
+      usedBefore = used;
+      brokenBefore = broken;
       used = false;
-      hydra?.hush();
+      broken = false;
+      if (fresh) hydra?.hush();
     },
     /** After a track's code ran and it plays. */
     afterRun() {
+      if (!used) hydra?.hush();
       running = true;
+      update();
+    },
+    /** The changed code failed: the visuals that ran before it carry on. */
+    failedRun() {
+      used = usedBefore;
+      broken = brokenBefore;
       update();
     },
     stop() {

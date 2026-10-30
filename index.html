@@ -77,6 +77,16 @@
           <p class="status" aria-live="polite"><span data-role="status"></span></p>
         </section>
 
+        <section class="card chords" data-role="chords" aria-labelledby="chords-title">
+          <div class="card-head">
+            <h3 id="chords-title">Guitar chords</h3>
+            <p class="hint" data-role="chords-hint">To play along in standard tuning (E A D G B E), worked out from the notes that play.</p>
+            <button type="button" class="small" data-role="chords-simple" aria-pressed="false" title="Only the basic chord (Fm instead of Fm9), easier to play">Simple chords</button>
+          </div>
+          <ol class="chord-row" data-role="chord-row" hidden></ol>
+          <p class="none" data-role="chords-none">The chords show up here while a track plays.</p>
+        </section>
+
         <section class="card mixer" data-role="mixer" aria-labelledby="mixer-title">
           <div class="card-head">
             <h3 id="mixer-title">Mixer</h3>
@@ -97,8 +107,17 @@
         </section>
 
         <details class="card source" open>
-          <summary>Code <a data-role="open" href="https://strudel.cc/" target="_blank" rel="noopener">Open in strudel.cc</a></summary>
-          <pre><code data-role="code"></code></pre>
+          <summary>Code <span class="edited" data-role="edited" hidden>edited</span> <a data-role="open" href="https://strudel.cc/" target="_blank" rel="noopener">Open in strudel.cc</a></summary>
+          <div class="code-tools">
+            <button type="button" class="small" data-role="apply" disabled title="Ctrl+Enter (⌘+Enter on a Mac)">Update</button>
+            <button type="button" class="small" data-role="revert" hidden>Undo my changes</button>
+            <p class="hint" data-role="code-hint">Change the code while it plays, then press Update or Ctrl+Enter. Ctrl+. stops.</p>
+          </div>
+          <div class="editor">
+            <pre class="code-layer" data-role="code-layer" aria-hidden="true"><span class="error-line" data-role="error-line" hidden></span><code data-role="code"></code></pre>
+            <textarea class="code-input" data-role="code-input" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-label="Strudel code of the track"></textarea>
+          </div>
+          <button type="button" class="code-error" data-role="code-error" hidden></button>
         </details>
       </div>
     </main>

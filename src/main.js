@@ -16,12 +16,17 @@ function safeStorage() {
 
 // Tracks call initHydra() and H() as on strudel.cc, so both are globals.
 let engine = null;
-const visuals = createVisuals({ canvas: document.querySelector('[data-role=visuals]'), now: () => engine.position() });
+let app = null;
+const visuals = createVisuals({
+  canvas: document.querySelector('[data-role=visuals]'),
+  now: () => engine.position(),
+  onError: (err) => app?.visualsError(err),
+});
 window.initHydra = visuals.initHydra;
 window.H = visuals.H;
-engine = createEngine({ visuals });
+engine = createEngine({ visuals, onPlaybackError: (err, info) => app?.playbackError(err, info) });
 
-const app = await createApp({
+app = await createApp({
   root: document.querySelector('[data-role=app]'),
   engine,
   visuals,
