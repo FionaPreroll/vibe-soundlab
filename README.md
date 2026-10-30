@@ -32,8 +32,8 @@ pnpm test         # node --test, needs Node 18+
 pnpm run coverage # the same with a coverage report of js/ in lcov.info, needs Node 22
 ```
 
-CI uploads `lcov.info` to [Codecov](https://app.codecov.io/gh/FionaPreroll/vibe-soundlab/tree/soundlab)
-(repository secret `CODECOV_TOKEN`). Codecov only reports and never fails a pull request.
+CI uploads `lcov.info` to [Codecov](https://app.codecov.io/gh/FionaPreroll/vibe-soundlab/tree/soundlab).
+Codecov only reports and never fails a pull request (`codecov.yml`).
 
 ## Layout
 

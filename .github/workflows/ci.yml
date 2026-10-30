@@ -24,7 +24,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # the tests, with a coverage report of js/ in lcov.info
       - run: pnpm run coverage
-      # needs the CODECOV_TOKEN repository secret; a failed upload does not fail CI
+      # Codecov takes uploads from this public repo without a token; CODECOV_TOKEN is
+      # used if the secret exists. A failed upload does not fail CI.
       - uses: codecov/codecov-action@v7
         with:
           files: lcov.info
