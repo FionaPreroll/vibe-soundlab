@@ -104,17 +104,24 @@ try {
 
   // Mixer: in the drop, drums and bass reach their own strips; muting the bass silences its strip.
   step = 'mixer';
+  // Peak level of each strip over one second: one analyser block is only 43 ms, and a
+  // sparse drum part can be quiet for that long.
   const levels = () =>
-    page.evaluate(() => {
+    page.evaluate(async () => {
       const graph = window.vibePlayer.engine.mixer();
       if (!graph) return null;
-      const peak = (target) => {
-        const analyser = graph.analyser(target);
-        const data = new Float32Array(analyser.fftSize);
-        analyser.getFloatTimeDomainData(data);
-        return Math.max(...data.map(Math.abs));
-      };
-      return Object.fromEntries(['master', 1, 2, 3].map((t) => [t, peak(t)]));
+      const targets = ['master', 1, 2, 3];
+      const peaks = Object.fromEntries(targets.map((t) => [t, 0]));
+      for (let i = 0; i < 20; i++) {
+        for (const target of targets) {
+          const analyser = graph.analyser(target);
+          const data = new Float32Array(analyser.fftSize);
+          analyser.getFloatTimeDomainData(data);
+          peaks[target] = Math.max(peaks[target], ...data.map(Math.abs));
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      return peaks;
     });
   const loud = await levels();
   console.log(`mixer peaks: ${JSON.stringify(loud)}`);
