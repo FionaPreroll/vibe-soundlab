@@ -32,5 +32,6 @@ All notable changes to the player and its tracks. The format follows
 - Notes on orbits the mixer has no channel for (like 0.5 or 12) are no longer dropped; they play on the first channel.
 - A song that replaces one of Strudel's own functions no longer breaks the songs you play after it.
 - Songs that use `all()` work again after a track with visuals has played.
+- Songs that load samples from another site (like tzwaan's liquid and insomnia) no longer fail to play when that site doesn't answer or doesn't let other web pages use its files. They play with the standard sounds instead, and the player says which site failed and why. A site that takes longer than 10 seconds to answer is skipped too.
 - Starkstrom: the drum break in the second half no longer stumbles. It was a loop longer than one bar squeezed into one bar; it is now a clean one-bar break.
 - Druckwelle: the foghorn bass no longer sounds raspy. It now uses two saws and a stronger, smoother saturation instead of a filter bite on every note.

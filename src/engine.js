@@ -2,6 +2,7 @@
 // The Strudel version here must match the one the tests run against (package.json).
 import { checkDensity, guardPattern, installLoopGuard, locateError, protectLoops } from './guard.js';
 import { createMixerGraph } from './mixer-graph.js';
+import { SAMPLES_TIMEOUT_MS, forgivingSamples } from './samples.js';
 import { BANK_ALIASES, addStrudelCcExtras, rememberStrudel } from './strudel-cc.js';
 
 export const STRUDEL_VERSION = '1.2.6';
@@ -41,6 +42,8 @@ export const hasStrip = (orbit) => orbit == null || (Number.isInteger(orbit) && 
  * hears about errors once a track plays (see guard.js): the pattern went silent and
  * playback stopped, or a change made while it played failed and the version before
  * it plays again. `installGuard` sets up the check that stops loops that never end.
+ * `fetchSamples` asks again for a sample list a song could not load, to say why, and
+ * `samplesTimeout` is how long a song waits for one (see samples.js).
  */
 export function createEngine({
   load = () => import(STRUDEL_URL),
@@ -51,6 +54,8 @@ export function createEngine({
   onPlaybackError = () => {},
   installGuard = installLoopGuard,
   evalTimeout = EVAL_TIMEOUT_MS,
+  fetchSamples = (url) => fetch(url),
+  samplesTimeout = SAMPLES_TIMEOUT_MS,
 } = {}) {
   let strudel = null;
   let repl = null;
@@ -76,6 +81,8 @@ export function createEngine({
   // Undoes what earlier songs changed in Strudel (see rememberStrudel).
   let restoreStrudel = () => {};
   let loops = { touch() {} };
+  // Sample sets from other sites the code being evaluated could not load.
+  let skipped = [];
 
   function init() {
     ready ??= (async () => {
@@ -116,6 +123,9 @@ export function createEngine({
         }),
       });
       addStrudelCcExtras(strudel);
+      // A song's sample sets from other sites: one that doesn't load is left out
+      // instead of stopping the song. The defaults above still load as Strudel does.
+      globalThis.samples = forgivingSamples(strudel.samples, { onSkip: (skip) => skipped.push(skip), fetchFn: fetchSamples, timeout: samplesTimeout });
       loops = installGuard();
       // The globals songs use: Strudel's own, the extras and the Hydra ones (main.js).
       restoreStrudel = rememberStrudel(strudel, [...Object.keys(strudel), 'sliderWithID', 'slider', 'o', 'initHydra', 'H']);
@@ -141,7 +151,9 @@ export function createEngine({
 
   /**
    * Evaluates and starts the code, from bar `from` (0-based) if given.
-   * Throws if Strudel reports an error in it.
+   * Throws if Strudel reports an error in it. Resolves to `{ skippedSamples }`, the
+   * sample sets from other sites it plays without (see samples.js), or to undefined
+   * when it was stopped meanwhile.
    */
   function play(code, { from = 0 } = {}) {
     const run = queue.then(() => playNow(code, from));
@@ -236,6 +248,7 @@ export function createEngine({
   async function run(code, prepared, update) {
     const mine = generation;
     evalError = null;
+    skipped = [];
     incoming = { code, toOriginal: prepared.toOriginal, update, generation: mine };
     restoreStrudel();
     loops.touch();
@@ -281,17 +294,18 @@ export function createEngine({
       visuals?.stop();
       throw err;
     }
-    if (!started) return;
+    if (!started) return undefined;
     visuals?.afterRun();
     seekFloor = null;
     if (from > 0) seek(from);
+    return { skippedSamples: skipped };
   }
 
   /**
    * Swaps in changed code while a track plays, without starting it over: the music
    * keeps its place. If the code has an error, the version that played keeps playing
    * and the error is thrown (with `location` when it is known). Starts playing if
-   * nothing plays.
+   * nothing plays. Resolves as play() does.
    */
   function update(code) {
     const next = queue.then(() => (playing ? updateNow(code) : playNow(code, 0)));
@@ -304,12 +318,13 @@ export function createEngine({
     visuals?.beforeRun({ fresh: false });
     probeAt = Math.max(0, repl.scheduler?.now?.() ?? 0);
     try {
-      if (!(await run(code, prepared, true))) return;
+      if (!(await run(code, prepared, true))) return undefined;
     } catch (err) {
       visuals?.failedRun?.();
       throw err;
     }
     visuals?.afterRun();
+    return { skippedSamples: skipped };
   }
 
   // A pattern that plays went silent (`tripped`) or threw. A change made while playing

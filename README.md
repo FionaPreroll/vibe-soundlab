@@ -203,6 +203,13 @@ and `src/engine.js` add them:
   Strudel 1.3, which strudel.cc runs);
 - the editor's pianorolls and scopes (`_pianoroll()`, `.scope()`, …), which leave the pattern as it is.
 
+Songs load sample sets from other sites with `samples('https://…/strudel.json')`. Strudel waits
+for that and stops the whole song when the list doesn't load: the site is down, or it doesn't send
+CORS headers that let this page read it (a site can allow strudel.cc and no one else). The songs get
+a `samples()` that leaves such a list out after asking once more why (`src/samples.js`): the song
+plays with the standard sounds and the status line names the site and the reason. A list that takes
+longer than 10 seconds is left out too. Sample maps written in the code still fail like other mistakes.
+
 Orbits the mixer has no strip for (`orbit(0.5)`, `orbit(12)`) play on the first strip. Songs also
 change Strudel itself (`register('as', …)` replaces a built-in), so before every song the engine puts
 Strudel's methods and globals back as they were after loading. Hydra's own `noise()`, `shape()`,
@@ -210,8 +217,8 @@ Strudel's methods and globals back as they were after loading. Hydra's own `nois
 hidden from `for…in`, which Strudel's `all()` uses (`src/visuals.js`).
 
 What still doesn't play: songs that need a Strudel newer than 1.2.6 (`fm1`, `.env()`, `cyclesPer`),
-MIDI, functions from a repository's own prebake file, and samples from hosts that are down or block
-other sites.
+MIDI and functions from a repository's own prebake file. Songs whose samples come from hosts that
+are down or block other sites play without those samples.
 
 ## Run it
 
@@ -282,6 +289,6 @@ For the chiptunes (`test/support/tracker.js`, tried on small examples in `test/t
 | `tracks/` | the Strudel tracks and `index.json` |
 | `sources/` | `index.json`, the songs from other GitHub repositories (written by `pnpm run sources`) |
 | `index.html`, `css/` | the player page |
-| `src/` | player code: engine (Strudel, seeking, changes while playing), guards against mistakes in the code, library (repo tracks, uploads, songs from GitHub), playlist and repeat rules, track parts for the progress bar, mixer (settings, audio graph, EQ math, meters, panel), code highlighting and editor, guitar chords and shapes, Hydra visuals, upload checks, header parsing, strudel.cc links and extras, the GitHub sources |
+| `src/` | player code: engine (Strudel, seeking, changes while playing), guards against mistakes in the code, library (repo tracks, uploads, songs from GitHub), playlist and repeat rules, track parts for the progress bar, mixer (settings, audio graph, EQ math, meters, panel), code highlighting and editor, guitar chords and shapes, Hydra visuals, upload checks, header parsing, strudel.cc links and extras, samples from other sites, the GitHub sources |
 | `scripts/` | `index-tracks.js` (track index), `index-sources.js` (songs from GitHub), `snapshot-samples.js` (sample names for the tests) |
 | `test/` | tests; `test/support/` runs Strudel in Node and holds the harmony and tracker checks |
