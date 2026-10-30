@@ -99,6 +99,42 @@
       "bars": 120,
       "order": 10,
       "about": "An 808 boom on every kick, a subby Reese rolling in the gaps, warm keys and chopped amens."
+    },
+    {
+      "file": "seriennummer.js",
+      "title": "Seriennummer",
+      "style": "Keygen chiptune",
+      "bpm": 140,
+      "key": "A minor",
+      "bars": 88,
+      "order": 11,
+      "channels": "6",
+      "mixer": "Kick + snare, Bass, Arpeggio, Hats, Echo, Lead",
+      "about": "A keygen anthem in FastTracker style: six channels, shimmering arpeggios, a heroic lead and its echo."
+    },
+    {
+      "file": "rasterzeile.js",
+      "title": "Rasterzeile",
+      "style": "C64 SID chiptune",
+      "bpm": 150,
+      "key": "B minor",
+      "bars": 88,
+      "order": 12,
+      "channels": "3",
+      "mixer": ", Bass + drums, Arpeggio, , , Lead",
+      "about": "Three voices like the C64's SID chip: a PWM lead, a fast arpeggio, and one voice for bass and drums together."
+    },
+    {
+      "file": "sternenfeld.js",
+      "title": "Sternenfeld",
+      "style": "Amiga demoscene chiptune",
+      "bpm": 125,
+      "key": "D major",
+      "bars": 80,
+      "order": 13,
+      "channels": "4",
+      "mixer": "Drums + echo, Bass, Arpeggio, , , Lead",
+      "about": "A cheerful Amiga intro tune on four channels panned left-right-right-left, the drum channel turns into an echo in the break."
     }
   ]
 }

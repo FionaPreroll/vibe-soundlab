@@ -101,6 +101,9 @@ test('every atom Strudel can mark in the tracks is a token of its own', () => {
     );
     const { miniLocations } = transpiler(code, { emitMiniLocations: true });
     const missing = miniLocations
+      // Strudel counts the line break after a factor at the end of a line ("*2\n") into
+      // the atom; marking works by overlap, so only the visible part needs its own token.
+      .map(([start, end]) => [start, start + code.slice(start, end).trimEnd().length])
       .filter(([start, end]) => code.slice(start, end).trim() !== '~') // rests play nothing
       .filter(([start, end]) => !atoms.has(`${start}:${end}`))
       .map(([start, end]) => code.slice(start, end));

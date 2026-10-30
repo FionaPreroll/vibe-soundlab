@@ -7,6 +7,10 @@ import { createApp, describeTrack } from '../src/app.js';
 import { STORAGE_KEY } from '../src/library.js';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+// the repo tracks in the order the player lists them, so new tracks need no test changes
+const repoTracks = JSON.parse(readFileSync(new URL('../tracks/index.json', import.meta.url), 'utf8')).tracks;
+const lastTrack = repoTracks.at(-1);
+const lastTrackId = `repo:${lastTrack.file.replace(/\.js$/, '')}`;
 
 const response = (body, ok = true, status = 200) => ({ ok, status, json: async () => JSON.parse(body), text: async () => body });
 const repoFetch = async (url) => {
@@ -94,7 +98,8 @@ async function start(options = {}) {
 
 test('lists the repo tracks in order and selects the first', async () => {
   await start();
-  assert.deepEqual(names(), ['Nachtschicht', 'Nebelhorn', 'Glasregen', 'Polarlicht', 'Druckwelle', 'Kernschmelze', 'Starkstrom', 'Tiefgarage', 'Schwerkraft', 'Unterströmung']);
+  assert.deepEqual(names(), repoTracks.map((t) => t.title));
+  assert.equal(names()[0], 'Nachtschicht');
   assert.equal($('[data-role=title]').textContent, 'Nachtschicht');
   assert.match($('[data-role=details]').textContent, /Dark techstep · F minor · 174 BPM · 2:46/);
   assert.match($('[data-role=code]').textContent, /NACHTSCHICHT/);
@@ -141,7 +146,7 @@ test('picking a track while stopped only selects it', async () => {
 test('next and previous wrap around the list', async () => {
   await start();
   click($('[data-role=prev]'));
-  assert.equal($('[data-role=title]').textContent, 'Unterströmung');
+  assert.equal($('[data-role=title]').textContent, lastTrack.title);
   click($('[data-role=next]'));
   click($('[data-role=next]'));
   assert.equal($('[data-role=title]').textContent, 'Nebelhorn');
@@ -195,7 +200,7 @@ test('uploads are added, selected, kept and removable', async () => {
   await settle();
   click($('.track.uploaded .remove'));
   assert.equal(engine.stops, 1);
-  assert.equal(names().length, 10);
+  assert.equal(names().length, repoTracks.length);
   assert.equal($('[data-role=title]').textContent, 'Nachtschicht');
 });
 
@@ -376,7 +381,7 @@ test('when a track ends, the next one starts', async () => {
 
 test('repeat off stops after the last track', async () => {
   const { app, engine } = await start();
-  app.select('repo:unterstroemung');
+  app.select(lastTrackId);
   click($('[data-role=play]'));
   await settle();
   await finish(app, engine);
@@ -395,7 +400,7 @@ test('repeat all starts over, repeat one plays the same track again', async () =
   assert.equal(repeatButton().getAttribute('aria-pressed'), 'true');
   assert.equal(storage.data['vibe-player:repeat'], 'all');
 
-  app.select('repo:unterstroemung');
+  app.select(lastTrackId);
   click($('[data-role=play]'));
   await settle();
   await finish(app, engine);
