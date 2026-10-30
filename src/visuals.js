@@ -27,6 +27,13 @@ export function inertHydra() {
   return chain;
 }
 
+// Hydra gives every array .fast(), .smooth() … for its own arguments, as properties
+// for…in sees. Strudel runs the functions songs pass to all() with for…in, so after the
+// first visuals it called Hydra's helpers too and every song with all() failed.
+function hideArrayHelpers() {
+  for (const name of Object.keys(Array.prototype)) Object.defineProperty(Array.prototype, name, { enumerable: false });
+}
+
 // Hydra's browser build sets window.Hydra when it loads.
 const loadHydra = async (win) => {
   await import(HYDRA_URL);
@@ -47,6 +54,9 @@ export function createVisuals({ canvas, now = () => null, load = loadHydra, scal
   let enabled = true;
   let frame = null;
   let last = 0;
+  // What Hydra put on window. Before each track the player puts Strudel's own noise(),
+  // shape(), speed() … back, so every track that starts Hydra gets these again.
+  let globals = {};
 
   function size() {
     const width = Math.max(1, Math.round(win.innerWidth * scale));
@@ -58,10 +68,12 @@ export function createVisuals({ canvas, now = () => null, load = loadHydra, scal
     try {
       const Hydra = await load(win);
       hydra = new Hydra({ canvas, ...size(), detectAudio: false, makeGlobal: true, autoLoop: false, precision: 'mediump' });
+      globals = Object.fromEntries(Object.keys(hydra.synth ?? {}).map((name) => [name, win[name]]));
+      hideArrayHelpers();
     } catch (err) {
       console.warn('No visuals, Hydra did not start:', err?.message ?? err);
       const stub = inertHydra();
-      for (const name of HYDRA_GLOBALS) win[name] = stub;
+      globals = Object.fromEntries(HYDRA_GLOBALS.map((name) => [name, stub]));
     }
   }
 
@@ -70,6 +82,7 @@ export function createVisuals({ canvas, now = () => null, load = loadHydra, scal
     used = true;
     starting ??= start();
     await starting;
+    Object.assign(win, globals);
   }
 
   /** What track code calls as H(pattern): a function returning the pattern's value right now. */

@@ -4,7 +4,8 @@
 
 Drum & bass and chiptunes written in [Strudel](https://strudel.cc/), and a browser player for them:
 four atmospheric tracks, three bangers, three Reese rollers and three keygen-style chiptunes.
-Pick one of the tracks in this repo, or upload your own Strudel file and play it next to them.
+Pick one of the tracks in this repo, upload your own Strudel file and play it next to them, or switch
+on the songs other people share on GitHub (see [Songs from GitHub](#songs-from-github)).
 Play runs through the list: when a track reaches its last bar (`@bars`), the next one starts.
 The repeat button switches between off (stop after the last track), all (start over) and one
 (repeat the current track). Uploads without a `@bars` header loop until you pick another track.
@@ -127,6 +128,57 @@ channel plays one sound at a time, so the header's number is a real limit:
 There is no pad. The arpeggio channel spells the chords, and an echo is a quieter copy of the lead
 on a channel of its own, not a delay effect.
 
+## Songs from GitHub
+
+The player can also list Strudel songs from other people's GitHub repositories:
+
+| Repository | What is in it | Folders listed |
+| --- | --- | --- |
+| [eefano/strudel-songs-collection](https://github.com/eefano/strudel-songs-collection) | covers and originals | top level, `jamsessions/`, `tinkering/` (not `functions/`, which are helpers) |
+| [tzwaan/strudel-scripts](https://github.com/tzwaan/strudel-scripts) | trance, liquid, game soundtracks | `songs/`, `songs/game-ost/` (not `prebake.js`, `strudeldj.js`) |
+| [Mariaareadne1/maria-live-codes](https://github.com/Mariaareadne1/maria-live-codes) | live-coded covers | `songs/` |
+
+Playing one of these songs runs its code in the page, so they stay hidden until the listener
+switches them on ("Show their songs"); the choice is kept in the browser and can be undone. Before
+that, the player asks GitHub for nothing, not even the list.
+
+`src/sources.js` says where each repository keeps its songs (`folders`) and reads what the player
+shows from the comments at the top of each file, since none of them uses this repo's header:
+
+- the title from `// @title …` (also in a `/* … */` block), else from a quoted first comment like
+  `// "Aztec Challenge" (work in progress)` (the rest of the line becomes a note), else from a comment
+  that spells out the file name (`// HAPPY BIRTHDAY` in `happybirthday.js`), else from the file name;
+- credits from lines like `// song @by Cardiacs`, `// script @by eefano`, `// @by Koji Kondo`,
+  `// transcribed @by tzwaan` or `// @song by Parquet Courts`.
+
+`pnpm run sources` clones each repository, reads its files as text (nothing in them runs) and writes
+`sources/index.json` with the songs and the commit it read. It prints the `.js` files it left out,
+so a new folder in one of the repositories shows up there. The player lists the songs from that file
+and loads a song's code from `raw.githubusercontent.com` at that commit when it is picked, so it runs
+exactly the code that was listed, even if the repository changes later. To list a newer version, run
+the script again and commit the index.
+
+Songs written on strudel.cc expect a few things `@strudel/web` does not have; `src/strudel-cc.js`
+and `src/engine.js` add them:
+
+- the sounds strudel.cc starts with: the General MIDI instruments (`gm_piano`, …) from
+  `@strudel/soundfonts` (pinned to the Strudel version; it imports Strudel by package name, so the
+  import map in `index.html` points those names at the player's copy, `src/strudel-bridge.js`), the
+  ZZFX synths, the `EmuSP12` drum machine and the short drum machine names (`tr909`, `linn`, …);
+- `slider(…)`, which keeps the value it starts with, `piano()`, and `o()` for `orbit()` (from
+  Strudel 1.3, which strudel.cc runs);
+- the editor's pianorolls and scopes (`_pianoroll()`, `.scope()`, …), which leave the pattern as it is.
+
+Orbits the mixer has no strip for (`orbit(0.5)`, `orbit(12)`) play on the first strip. Songs also
+change Strudel itself (`register('as', …)` replaces a built-in), so before every song the engine puts
+Strudel's methods and globals back as they were after loading. Hydra's own `noise()`, `shape()`,
+`speed` … come back with every `initHydra()`, and Hydra's array helpers (`[1, 2].fast(2)`) are
+hidden from `for…in`, which Strudel's `all()` uses (`src/visuals.js`).
+
+What still doesn't play: songs that need a Strudel newer than 1.2.6 (`fm1`, `.env()`, `cyclesPer`),
+MIDI, functions from a repository's own prebake file, and samples from hosts that are down or block
+other sites.
+
 ## Run it
 
 The project uses [pnpm](https://pnpm.io/installation). `package.json` pins its version
@@ -137,8 +189,8 @@ pnpm install
 pnpm start        # serves the folder at http://localhost:8000
 ```
 
-Strudel itself loads from the jsDelivr CDN (`@strudel/web`, pinned in `src/engine.js`), and so
-does Hydra (`hydra-synth`, pinned in `src/visuals.js`).
+Strudel itself loads from the jsDelivr CDN (`@strudel/web` and `@strudel/soundfonts`, pinned in
+`src/engine.js`), and so does Hydra (`hydra-synth`, pinned in `src/visuals.js`).
 Uploaded tracks are kept in the browser's local storage.
 
 ## Tests
@@ -146,7 +198,7 @@ Uploaded tracks are kept in the browser's local storage.
 ```sh
 pnpm test         # all unit and track tests
 pnpm run coverage # the same, failing below 95 % line coverage of src/; writes lcov.info
-pnpm run e2e      # plays every track in headless Chromium (needs Playwright)
+pnpm run e2e      # plays every track and a stand-in song from GitHub in headless Chromium (needs Playwright)
 ```
 
 CI uploads `lcov.info` to [Codecov](https://codecov.io/gh/FionaPreroll/vibe-soundlab) on every
@@ -194,7 +246,8 @@ For the chiptunes (`test/support/tracker.js`, tried on small examples in `test/t
 | Path | What it holds |
 | --- | --- |
 | `tracks/` | the Strudel tracks and `index.json` |
+| `sources/` | `index.json`, the songs from other GitHub repositories (written by `pnpm run sources`) |
 | `index.html`, `css/` | the player page |
-| `src/` | player code: engine (Strudel, seeking), library (repo tracks and uploads), playlist and repeat rules, track parts for the progress bar, mixer (settings, audio graph, EQ math, meters, panel), code highlighting, Hydra visuals, upload checks, header parsing, strudel.cc links |
-| `scripts/` | `index-tracks.js` (track index), `snapshot-samples.js` (sample names for the tests) |
+| `src/` | player code: engine (Strudel, seeking), library (repo tracks, uploads, songs from GitHub), playlist and repeat rules, track parts for the progress bar, mixer (settings, audio graph, EQ math, meters, panel), code highlighting, Hydra visuals, upload checks, header parsing, strudel.cc links and extras, the GitHub sources |
+| `scripts/` | `index-tracks.js` (track index), `index-sources.js` (songs from GitHub), `snapshot-samples.js` (sample names for the tests) |
 | `test/` | tests; `test/support/` runs Strudel in Node and holds the harmony and tracker checks |

@@ -1,9 +1,13 @@
 // Plays Strudel code in the browser through @strudel/web.
 // The Strudel version here must match the one the tests run against (package.json).
 import { createMixerGraph } from './mixer-graph.js';
+import { BANK_ALIASES, addStrudelCcExtras, rememberStrudel } from './strudel-cc.js';
 
 export const STRUDEL_VERSION = '1.2.6';
 export const STRUDEL_URL = `https://cdn.jsdelivr.net/npm/@strudel/web@${STRUDEL_VERSION}/dist/index.mjs`;
+// The General MIDI instruments (gm_piano, gm_flute, …) strudel.cc has. This module imports
+// Strudel by its package names; the import map in index.html points them at STRUDEL_URL.
+export const SOUNDFONTS_URL = `https://cdn.jsdelivr.net/npm/@strudel/soundfonts@${STRUDEL_VERSION}/dist/index.mjs`;
 
 // The sample sets strudel.cc loads by default, so tracks written there play here too.
 const DOUGH = 'https://raw.githubusercontent.com/felixroos/dough-samples/main';
@@ -12,18 +16,29 @@ export const SAMPLE_MAPS = [
   `${DOUGH}/piano.json`,
   `${DOUGH}/vcsl.json`,
   `${DOUGH}/mridangam.json`,
+  `${DOUGH}/EmuSP12.json`,
   'github:tidalcycles/dirt-samples',
 ];
 
 // Orbits the tracks use (see the README). Seeking creates them up front.
 export const ORBITS = 8;
 
+/** Whether the mixer has a strip for this orbit (no orbit means orbit 1). */
+export const hasStrip = (orbit) => orbit == null || (Number.isInteger(orbit) && orbit >= 1 && orbit <= ORBITS);
+
 /**
  * `createGraph` builds the mixer between Strudel and the speakers (null plays
  * without one); `later` runs a callback after a delay in ms; `visuals` (see
- * visuals.js) is told when a track's code runs, plays and stops.
+ * visuals.js) is told when a track's code runs, plays and stops; `loadSoundfonts`
+ * loads the General MIDI instruments.
  */
-export function createEngine({ load = () => import(STRUDEL_URL), createGraph = createMixerGraph, later = setTimeout, visuals = null } = {}) {
+export function createEngine({
+  load = () => import(STRUDEL_URL),
+  loadSoundfonts = () => import(SOUNDFONTS_URL),
+  createGraph = createMixerGraph,
+  later = setTimeout,
+  visuals = null,
+} = {}) {
   let strudel = null;
   let repl = null;
   let ready = null;
@@ -36,29 +51,50 @@ export function createEngine({ load = () => import(STRUDEL_URL), createGraph = c
   let generation = 0;
   // The pattern playing now, for marking its notes in the code.
   let pattern = null;
+  // Undoes what earlier songs changed in Strudel (see rememberStrudel).
+  let restoreStrudel = () => {};
 
   function init() {
     ready ??= (async () => {
       strudel = await load();
       repl = await strudel.initStrudel({
-        prebake: () => Promise.all(SAMPLE_MAPS.map((map) => strudel.samples(map))),
+        prebake: async () => {
+          // The same sounds strudel.cc starts with: samples, ZZFX synths, General MIDI.
+          await Promise.all([...SAMPLE_MAPS.map((map) => strudel.samples(map)), strudel.registerZZFXSounds(), registerSoundfonts()]);
+          // Needs the drum machines loaded: it adds the short names to the sounds that exist.
+          strudel.aliasBank(BANK_ALIASES);
+        },
         onEvalError: (err) => {
           evalError = err;
         },
         // With the mixer, every orbit gets its own pair of channels. Strudel resets
         // this setting when it starts its audio, so it is set again for each note.
+        // Orbits without a strip (songs from elsewhere use 0.5 or 12) play on the first
+        // pair, as without the mixer; Strudel reads the setting before its first await.
         ...(createGraph && {
-          defaultOutput: (...args) => {
-            strudel.setMultiChannelOrbits(true);
-            return strudel.webaudioOutput(...args);
+          defaultOutput: (hap, ...rest) => {
+            strudel.setMultiChannelOrbits(hasStrip(hap?.value?.orbit));
+            return strudel.webaudioOutput(hap, ...rest);
           },
         }),
       });
+      addStrudelCcExtras(strudel);
+      // The globals songs use: Strudel's own, the extras and the Hydra ones (main.js).
+      restoreStrudel = rememberStrudel(strudel, [...Object.keys(strudel), 'sliderWithID', 'slider', 'o', 'initHydra', 'H']);
     })().catch((err) => {
       ready = null;
       throw err;
     });
     return ready;
+  }
+
+  // Without them, songs that use gm_ sounds miss those parts; everything else still plays.
+  async function registerSoundfonts() {
+    try {
+      (await loadSoundfonts()).registerSoundfonts();
+    } catch (err) {
+      console.warn('Playing without the General MIDI instruments:', err?.message ?? err);
+    }
   }
 
   // Plays run one after another: a second click while a track is still
@@ -102,6 +138,7 @@ export function createEngine({ load = () => import(STRUDEL_URL), createGraph = c
     generation++;
     graph?.fadeIn(0);
     visuals?.beforeRun();
+    restoreStrudel();
     const evaluated = await strudel.evaluate(code);
     if (evalError || !evaluated) {
       playing = false;

@@ -74,7 +74,7 @@ a { color: var(--accent); }
 /* Hydra visuals fill the window behind the player while a track with visuals plays. */
 .visuals { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; opacity: 0; transition: opacity .8s; }
 .visuals.on { opacity: .9; }
-body:has(.visuals.on) :is(.now, .card, .track, .drop) { background: color-mix(in srgb, var(--panel) 80%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+body:has(.visuals.on) :is(.now, .card, .track, .drop, .consent, .source, .find) { background: color-mix(in srgb, var(--panel) 80%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 body:has(.visuals.on) .top { text-shadow: 0 1px 10px var(--bg); }
 .top h1 { margin: 0; font-size: 1.6rem; letter-spacing: .01em; }
 .top h1 span { color: var(--muted); font-weight: 400; }
@@ -91,6 +91,36 @@ body:has(.visuals.on) .top { text-shadow: 0 1px 10px var(--bg); }
 .track.uploaded .name::after { content: " · uploaded"; color: var(--muted); font-weight: 400; font-size: .8rem; }
 .track .remove { background: none; border: 0; color: var(--muted); font-size: 1.2rem; padding: 0 12px; cursor: pointer; }
 .track .remove:hover { color: var(--error); }
+
+/* Songs from GitHub: a switch first, then one foldable list per repository. */
+.external { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.external h2 { margin: 0; font-size: 1rem; }
+.consent { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; color: var(--muted); font-size: .9rem; }
+.consent p { margin: 0 0 10px; }
+.consent .small, .browse > .small { margin-left: 0; }
+.browse { display: flex; flex-direction: column; gap: 8px; }
+.browse[hidden], .external [hidden] { display: none; }
+.find { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 7px 12px; }
+.find:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sources { display: flex; flex-direction: column; gap: 6px; }
+.source { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.source summary { display: flex; align-items: baseline; gap: 8px; padding: 10px 12px; cursor: pointer; }
+.source summary::marker { color: var(--muted); }
+.source .source-name { font-weight: 600; }
+.source .count { color: var(--muted); font-size: .85rem; }
+.source-about { margin: 0 12px 8px; color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
+.source .group { margin: 10px 12px 4px; font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.songs { list-style: none; margin: 0 0 6px; padding: 0 6px; display: flex; flex-direction: column; gap: 2px; }
+.song { border: 1px solid transparent; border-radius: 8px; }
+.song.selected { border-color: var(--accent); }
+.song .pick { width: 100%; text-align: left; background: none; border: 0; color: inherit; padding: 6px 8px; cursor: pointer; font: inherit; display: flex; flex-direction: column; min-width: 0; }
+.song .pick:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); border-radius: 7px; }
+.song .name { font-weight: 600; font-size: .92rem; }
+.song .name small { color: var(--muted); font-weight: 400; }
+.song .sub { color: var(--muted); font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.song.playing .name::before { content: "▶ "; color: var(--accent); }
+.none { margin: 0; color: var(--muted); font-size: .9rem; }
+.origin { margin: 6px 0 0; color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
 
 .drop { display: flex; flex-direction: column; gap: 2px; border: 1px dashed var(--line); border-radius: var(--radius); padding: 14px; cursor: pointer; color: var(--muted); }
 .drop strong { color: var(--text); }

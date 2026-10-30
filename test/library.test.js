@@ -85,3 +85,69 @@ test('neighbour wraps around in both directions', () => {
 test('names without letters still get an id', () => {
   assert.equal(new Library().addUpload({ name: '!!!.js', code: 's("bd")' }).id, 'upload:track');
 });
+
+const source = { id: 'demo', repo: 'someone/songs', name: 'someone', commit: 'c'.repeat(40) };
+const song = { path: 'songs/Night Bus.js', group: 'Songs', title: 'Night Bus', note: 'Work in progress', credits: [{ role: 'song', name: 'The Band' }] };
+
+test('songs from other repositories wait for their code', () => {
+  const lib = new Library();
+  const track = lib.addExternal(source, song);
+  assert.equal(track.id, 'ext:demo-songs-night-bus');
+  assert.equal(track.source, 'external');
+  assert.equal(track.code, null);
+  assert.deepEqual(track.origin, {
+    id: 'demo',
+    name: 'someone',
+    repo: 'someone/songs',
+    group: 'Songs',
+    url: `https://raw.githubusercontent.com/someone/songs/${'c'.repeat(40)}/songs/Night%20Bus.js`,
+    page: `https://github.com/someone/songs/blob/${'c'.repeat(40)}/songs/Night%20Bus.js`,
+  });
+  assert.equal(track.meta.title, 'Night Bus');
+  assert.equal(track.meta.note, 'Work in progress');
+  assert.equal(track.meta.credits, 'Song by The Band');
+  assert.match(track.meta.mixer, /^Orbit 1, Orbit 2, .*Orbit 8$/);
+  assert.equal(lib.find('demo-songs-night-bus'), track);
+
+  const bare = lib.addExternal(source, { path: 'x.js', group: 'Songs', title: 'X' });
+  assert.equal(bare.meta.note, null);
+  assert.equal(bare.meta.credits, null);
+});
+
+test('their code may bring a header, but the listed title stays', () => {
+  const lib = new Library();
+  const { id } = lib.addExternal(source, song);
+  const track = lib.setCode(id, '// @title Something Else\n// @bpm 140\n// @bars 64\ns("bd")');
+  assert.equal(track.code, '// @title Something Else\n// @bpm 140\n// @bars 64\ns("bd")');
+  assert.equal(track.meta.title, 'Night Bus');
+  assert.equal(track.meta.bars, 64);
+  assert.equal(lib.setCode('ext:missing', 's("bd")'), null);
+});
+
+test('songs from other repositories can all be taken off the list, and are never saved', () => {
+  const storage = new MemoryStorage();
+  const lib = new Library({ storage });
+  lib.addRepoTrack({ file: 'a.js', code: header('A') });
+  lib.addExternal(source, song);
+  lib.addUpload({ name: 'b.js', code: header('B') });
+  assert.deepEqual(JSON.parse(storage.data[STORAGE_KEY]).map((u) => u.name), ['b.js']);
+  assert.equal(lib.remove('ext:demo-songs-night-bus'), false);
+  lib.removeExternal();
+  assert.deepEqual(lib.list().map((t) => t.id), ['repo:a', 'upload:b']);
+});
+
+test('neighbour can stay within some of the tracks', () => {
+  const lib = new Library();
+  for (const name of ['a', 'b', 'c', 'd']) lib.addRepoTrack({ file: `${name}.js`, code: header(name) });
+  const odd = (t) => t.id === 'repo:a' || t.id === 'repo:c';
+  assert.equal(lib.neighbour('repo:a', 1, odd).id, 'repo:c');
+  assert.equal(lib.neighbour('repo:c', 1, odd).id, 'repo:a');
+  assert.equal(lib.neighbour('repo:b', 1, odd).id, 'repo:a', 'from outside, the first one');
+  assert.equal(lib.neighbour('repo:a', 1, () => false), null);
+});
+
+test('uploads without a header can name themselves the strudel.cc way', () => {
+  const lib = new Library();
+  assert.equal(lib.addUpload({ name: 'nightbus.js', code: '// "Night Bus" (wip)\n// song @by The Band\ns("bd")' }).meta.title, 'Night Bus');
+  assert.equal(lib.addRepoTrack({ file: 'plain.js', code: '// "Not This"\ns("bd")' }).meta.title, 'Plain', 'repo tracks keep their convention');
+});

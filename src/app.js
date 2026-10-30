@@ -9,7 +9,8 @@ import { createMixerPanel } from './mixer-panel.js';
 import { REPEAT_LABELS, hasEnded, nextRepeatMode, parseRepeatMode, trackAfter } from './playlist.js';
 import { parseSections, sectionAt } from './sections.js';
 import { strudelUrl } from './share.js';
-import { readUpload } from './upload.js';
+import { SOURCES, loadSources, repoUrl } from './sources.js';
+import { MAX_UPLOAD_BYTES, checkCode, readUpload } from './upload.js';
 
 const el = (doc, tag, props = {}, children = []) => {
   const node = doc.createElement(tag);
@@ -23,11 +24,13 @@ const el = (doc, tag, props = {}, children = []) => {
   return node;
 };
 
-/** "Liquid / atmospheric · C minor · 172 BPM · 2:58" */
+/** "Liquid / atmospheric · C minor · 172 BPM · 2:58", or "Song by Cardiacs · script by eefano" */
 export function describeTrack(meta) {
   const length = formatDuration(durationSeconds(meta));
-  return [meta.style, meta.key, meta.bpm && `${meta.bpm} BPM`, length].filter(Boolean).join(' · ');
+  return [meta.credits, meta.style, meta.key, meta.bpm && `${meta.bpm} BPM`, length].filter(Boolean).join(' · ');
 }
+
+const isExternal = (track) => track?.source === 'external';
 
 export async function createApp({ root, engine, fetchFn, storage = null, location = null, visuals = null }) {
   const doc = root.ownerDocument;
@@ -46,7 +49,19 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   } catch {
     // Blocked storage: visuals on.
   }
+  // Songs from other repositories run their code in this page, so they only show up
+  // once the listener has switched them on. The choice is remembered.
+  const EXTERNAL_KEY = 'vibe-player:external';
+  let storedExternal = null;
+  try {
+    storedExternal = storage?.getItem(EXTERNAL_KEY) ?? null;
+  } catch {
+    // Blocked storage: off until switched on.
+  }
   const state = {
+    external: storedExternal === 'on',
+    // the repositories from sources/index.json, once loaded
+    sources: [],
     visuals: storedVisuals !== 'off',
     selected: null,
     playing: null,
@@ -77,6 +92,12 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   const sectionName = q('[data-role=section]');
   const timeNow = q('[data-role=time]');
   const timeTotal = q('[data-role=length]');
+  const origin = q('[data-role=origin]');
+  const externalConsent = q('[data-role=external-consent]');
+  const externalBrowse = q('[data-role=external-browse]');
+  const externalList = q('[data-role=external-list]');
+  const externalFind = q('[data-role=external-find]');
+  const externalNone = q('[data-role=external-none]');
 
   const mixer = createMixerPanel({ mixerRoot: q('[data-role=mixer]'), eqRoot: q('[data-role=eq]'), engine, storage });
 
@@ -96,7 +117,7 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
 
   function renderList() {
     list.replaceChildren(
-      ...library.list().map((track) => {
+      ...library.list().filter((track) => !isExternal(track)).map((track) => {
         const pick = el(doc, 'button', { class: 'pick', type: 'button', 'data-id': track.id }, [
           el(doc, 'span', { class: 'name', text: track.meta.title }),
           el(doc, 'span', { class: 'sub', text: describeTrack(track.meta) || track.file }),
@@ -122,9 +143,14 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     const track = library.get(state.selected);
     title.textContent = track ? track.meta.title : 'No track';
     details.textContent = track ? describeTrack(track.meta) : '';
-    about.textContent = track?.meta.about ?? (track?.source === 'upload' ? `Uploaded: ${track.file}` : '');
+    about.textContent = track?.meta.about ?? (track?.source === 'upload' ? `Uploaded: ${track.file}` : track?.meta.note ?? '');
+    origin.hidden = !isExternal(track);
+    if (isExternal(track)) {
+      const link = el(doc, 'a', { href: track.origin.page, target: '_blank', rel: 'noopener', text: `${track.origin.repo}/${track.file}` });
+      origin.replaceChildren('From ', link, ' on GitHub');
+    }
     showCode(track);
-    openLink.href = track ? strudelUrl(track.code) : 'https://strudel.cc/';
+    openLink.href = track?.code != null ? strudelUrl(track.code) : 'https://strudel.cc/';
     const isPlaying = track !== null && state.playing === track.id;
     const isLoading = track !== null && state.loading === track.id;
     playButton.textContent = isLoading ? 'Loading…' : isPlaying ? 'Stop' : 'Play';
@@ -141,7 +167,7 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   let marker = null;
   let shownCode = null;
   function showCode(track) {
-    const text = track ? track.code : '';
+    const text = track?.code ?? '';
     if (text === shownCode) return;
     shownCode = text;
     marker = renderCode(code, text);
@@ -207,6 +233,7 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
 
   function render() {
     renderList();
+    markExternal();
     renderNow();
     // The mixer names the channels of the track that plays, or else of the one selected.
     mixer.setNames(channelNames(library.get(state.playing ?? state.selected)?.meta.mixer));
@@ -217,9 +244,47 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     if (!track) return null;
     state.selected = id;
     if (location) location.hash = id.split(':')[1];
+    if (isExternal(track)) reveal(track);
     render();
     if (autoplay) return play();
+    if (track.code === null) preload(track);
     return null;
+  }
+
+  // Code of songs from other repositories, loaded from GitHub the first time it is needed.
+  const codeLoads = new Map();
+  function codeOf(track) {
+    if (track.code !== null) return Promise.resolve(track.code);
+    if (!codeLoads.has(track.id)) codeLoads.set(track.id, fetchCode(track).finally(() => codeLoads.delete(track.id)));
+    return codeLoads.get(track.id);
+  }
+
+  async function fetchCode(track) {
+    let response;
+    try {
+      response = await fetchFn(track.origin.url);
+    } catch (err) {
+      throw new Error(`GitHub can't be reached (${err?.message ?? err}).`);
+    }
+    if (!response.ok) throw new Error(`GitHub answered ${response.status}.`);
+    const code = await response.text();
+    const problem = code.length > MAX_UPLOAD_BYTES ? `${track.file} is larger than ${MAX_UPLOAD_BYTES / 1024} KB.` : checkCode(track.file, code);
+    if (problem) throw new Error(problem);
+    library.setCode(track.id, code);
+    return code;
+  }
+
+  // Shows a song's code as soon as it is picked; playing it waits for the same load.
+  async function preload(track) {
+    const loading = `Loading ${track.meta.title} from GitHub…`;
+    setStatus(loading);
+    try {
+      await codeOf(track);
+      if (state.status === loading) setStatus('');
+    } catch (err) {
+      if (state.selected === track.id) setStatus(`Could not load ${track.meta.title}: ${err.message}`, true);
+    }
+    if (state.selected === track.id) renderNow();
   }
 
   // Every play or stop request gets a number; when an older request finishes
@@ -234,7 +299,10 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     setStatus(`Loading ${track.meta.title}…`);
     renderNow();
     try {
-      await engine.play(track.code, { from });
+      const code = track.code ?? (await codeOf(track));
+      // Stopped, or another track picked, while the code came from GitHub.
+      if (mine !== request) return;
+      await engine.play(code, { from });
       if (mine !== request) {
         // Stop was pressed while this track was loading: silence it again.
         if (state.loading === null && state.playing === null) engine.stop();
@@ -325,6 +393,136 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     renderNow();
   }
 
+  // Songs from GitHub have a list of their own: next, previous and the end of a song
+  // stay in the list the track is in.
+  const sameList = (id) => {
+    const external = isExternal(library.get(id));
+    return (track) => isExternal(track) === external;
+  };
+
+  // The songs from GitHub: the switch, then one foldable list per repository,
+  // built when they load; render() only marks the selected and playing one.
+  const openSources = new Set();
+  const names = SOURCES.map(({ name, repo }) => el(doc, 'a', { href: `https://github.com/${repo}`, target: '_blank', rel: 'noopener', text: name }));
+  q('[data-role=external-names]').replaceChildren(...names.flatMap((link, i) => [i === 0 ? '' : i === names.length - 1 ? ' and ' : ', ', link]));
+
+  function renderExternal() {
+    externalConsent.hidden = state.external;
+    externalBrowse.hidden = !state.external;
+    const songs = library.list().filter(isExternal);
+    externalList.replaceChildren(
+      ...state.sources.map((source) => {
+        const mine = songs.filter((track) => track.origin.id === source.id);
+        const details = el(doc, 'details', { class: 'source', 'data-source': source.id }, [
+          el(doc, 'summary', {}, [el(doc, 'span', { class: 'source-name', text: source.name }), el(doc, 'span', { class: 'count', text: `${mine.length} songs` })]),
+          el(doc, 'p', { class: 'source-about' }, [`${source.about ?? ''} `, el(doc, 'a', { href: repoUrl(source), target: '_blank', rel: 'noopener', text: source.repo })]),
+          ...[...new Set(mine.map((track) => track.origin.group))].flatMap((group) => [
+            el(doc, 'h3', { class: 'group', text: group }),
+            el(doc, 'ul', { class: 'songs' }, mine.filter((track) => track.origin.group === group).map(songItem)),
+          ]),
+        ]);
+        details.open = openSources.has(source.id);
+        details.addEventListener('toggle', () => {
+          if (externalFind.value.trim() !== '') return;
+          if (details.open) openSources.add(source.id);
+          else openSources.delete(source.id);
+        });
+        return details;
+      }),
+    );
+    findExternal();
+    markExternal();
+  }
+
+  function songItem(track) {
+    const { title, note, credits } = track.meta;
+    const pick = el(doc, 'button', { class: 'pick', type: 'button', 'data-id': track.id }, [
+      el(doc, 'span', { class: 'name' }, [title, ...(note ? [' ', el(doc, 'small', { text: note })] : [])]),
+      ...(credits ? [el(doc, 'span', { class: 'sub', text: credits })] : []),
+    ]);
+    pick.addEventListener('click', () => select(track.id, { autoplay: state.playing !== null }));
+    const item = el(doc, 'li', { class: 'song', 'data-id': track.id }, [pick]);
+    item.dataset.find = [title, note, credits, track.file, track.origin.group].filter(Boolean).join(' ').toLowerCase();
+    return item;
+  }
+
+  function markExternal() {
+    for (const item of externalList.querySelectorAll('.song')) {
+      const { id } = item.dataset;
+      item.classList.toggle('selected', id === state.selected);
+      item.classList.toggle('playing', id === state.playing);
+      item.querySelector('.pick').toggleAttribute('aria-current', id === state.selected);
+    }
+  }
+
+  // Opens the list a song is in, so a song picked by a link or by next/previous shows.
+  function reveal(track) {
+    openSources.add(track.origin.id);
+    const details = externalList.querySelector(`[data-source="${track.origin.id}"]`);
+    if (details) details.open = true;
+  }
+
+  // Filters the songs by title, note, credits, file and folder; matches open their list.
+  function findExternal() {
+    const words = externalFind.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    let shown = 0;
+    for (const details of externalList.querySelectorAll('.source')) {
+      let inSource = 0;
+      for (const list of details.querySelectorAll('.songs')) {
+        let inGroup = 0;
+        for (const item of list.children) {
+          item.hidden = !words.every((word) => item.dataset.find.includes(word));
+          if (!item.hidden) inGroup++;
+        }
+        list.hidden = inGroup === 0;
+        list.previousElementSibling.hidden = inGroup === 0;
+        inSource += inGroup;
+      }
+      details.hidden = inSource === 0;
+      details.open = words.length > 0 ? inSource > 0 : openSources.has(details.dataset.source);
+      shown += inSource;
+    }
+    externalNone.hidden = shown > 0 || state.sources.length === 0;
+  }
+
+  async function loadExternal() {
+    try {
+      state.sources = await loadSources(fetchFn);
+      for (const source of state.sources) for (const song of source.songs) library.addExternal(source, song);
+    } catch (err) {
+      setStatus(err?.message ?? String(err), true);
+    }
+  }
+
+  function rememberExternal() {
+    try {
+      storage?.setItem(EXTERNAL_KEY, state.external ? 'on' : 'off');
+    } catch {
+      // Not remembered, but switched for this visit.
+    }
+  }
+
+  async function showExternal() {
+    if (state.external) return;
+    state.external = true;
+    rememberExternal();
+    renderExternal();
+    await loadExternal();
+    renderExternal();
+    render();
+  }
+
+  function hideExternal() {
+    if (isExternal(library.get(state.playing)) || isExternal(library.get(state.loading))) stop();
+    state.external = false;
+    rememberExternal();
+    library.removeExternal();
+    state.sources = [];
+    if (!library.get(state.selected)) state.selected = library.list()[0]?.id ?? null;
+    renderExternal();
+    render();
+  }
+
   /** Called a few times a second: shows the position and moves on when a track ends. */
   function updateProgress() {
     const track = library.get(state.playing);
@@ -334,7 +532,7 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
       return;
     }
     if (state.loading === null && hasEnded(pos, track.meta.bars)) {
-      const next = trackAfter(library.list().map((t) => t.id), track.id, state.repeat);
+      const next = trackAfter(library.list().filter(sameList(track.id)).map((t) => t.id), track.id, state.repeat);
       if (next === null) {
         stop();
         setStatus('End of playlist');
@@ -346,6 +544,9 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     renderSeek(pos);
   }
 
+  q('[data-role=external-on]').addEventListener('click', () => showExternal());
+  q('[data-role=external-off]').addEventListener('click', () => hideExternal());
+  externalFind.addEventListener('input', () => findExternal());
   playButton.addEventListener('click', () => toggle());
   repeatButton.addEventListener('click', () => cycleRepeat());
   visualsButton.addEventListener('click', () => toggleVisuals());
@@ -356,8 +557,9 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     renderSeek();
   });
   seekBar.addEventListener('change', () => seekTo(Number(seekBar.value)));
-  q('[data-role=prev]').addEventListener('click', () => select(library.neighbour(state.selected, -1)?.id, { autoplay: state.playing !== null }));
-  q('[data-role=next]').addEventListener('click', () => select(library.neighbour(state.selected, 1)?.id, { autoplay: state.playing !== null }));
+  const step = (by) => select(library.neighbour(state.selected, by, sameList(state.selected))?.id, { autoplay: state.playing !== null });
+  q('[data-role=prev]').addEventListener('click', () => step(-1));
+  q('[data-role=next]').addEventListener('click', () => step(1));
   fileInput.addEventListener('change', async () => {
     await addFiles(fileInput.files);
     fileInput.value = '';
@@ -395,9 +597,14 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     setStatus(`${err.message} You can still upload tracks.`, true);
   }
   library.restore();
+  if (state.external) await loadExternal();
+  renderExternal();
   const wanted = location?.hash ? library.find(decodeURIComponent(location.hash.slice(1))) : null;
   state.selected = (wanted ?? library.list()[0])?.id ?? null;
+  const first = library.get(state.selected);
+  if (isExternal(first)) reveal(first);
   render();
+  if (first?.code === null) preload(first);
 
   /** Called every animation frame with its time in ms: draws the meters and the EQ. */
   function drawFrame(now) {
@@ -405,5 +612,23 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     markPlaying(now);
   }
 
-  return { engine, library, state, mixer, select, play, stop, toggle, seekTo, addFiles, removeUpload, updateProgress, cycleRepeat, toggleVisuals, drawFrame };
+  return {
+    engine,
+    library,
+    state,
+    mixer,
+    select,
+    play,
+    stop,
+    toggle,
+    seekTo,
+    addFiles,
+    removeUpload,
+    updateProgress,
+    cycleRepeat,
+    toggleVisuals,
+    showExternal,
+    hideExternal,
+    drawFrame,
+  };
 }

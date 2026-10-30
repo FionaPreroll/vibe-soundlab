@@ -6,6 +6,16 @@
     <title>Vibe Soundlab Tracks</title>
     <meta name="description" content="Drum &amp; bass written in Strudel, from atmospheric rollers to bangers. Pick a track or upload your own." />
     <link rel="stylesheet" href="css/player.css" />
+    <!-- For @strudel/soundfonts (see src/strudel-bridge.js): it imports Strudel by package name. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "@strudel/core": "./src/strudel-bridge.js",
+          "@strudel/webaudio": "./src/strudel-bridge.js",
+          "sfumato": "./src/sfumato-stub.js"
+        }
+      }
+    </script>
   </head>
   <body>
     <canvas class="visuals" data-role="visuals" aria-hidden="true"></canvas>
@@ -23,6 +33,20 @@
           <span><strong>Upload a track</strong> or drop Strudel files here</span>
           <small>Uploads stay in this browser.</small>
         </label>
+
+        <section class="external" aria-labelledby="external-title">
+          <h2 id="external-title">Songs from GitHub</h2>
+          <div class="consent" data-role="external-consent">
+            <p>Strudel songs that <span data-role="external-names"></span> share in their GitHub repositories, from covers to game soundtracks. They come straight from there: playing one runs its code in this page, the way strudel.cc would. Only switch them on if you trust these repositories.</p>
+            <button type="button" class="small" data-role="external-on">Show their songs</button>
+          </div>
+          <div class="browse" data-role="external-browse" hidden>
+            <input type="search" class="find" data-role="external-find" placeholder="Find a song or artist" aria-label="Find a song or artist" />
+            <div class="sources" data-role="external-list"></div>
+            <p class="none" data-role="external-none" hidden>No song matches.</p>
+            <button type="button" class="small" data-role="external-off">Hide the songs from GitHub</button>
+          </div>
+        </section>
       </section>
 
       <div class="stage">
@@ -40,6 +64,7 @@
             </div>
           </div>
           <p class="about" data-role="about"></p>
+          <p class="origin" data-role="origin" hidden></p>
           <div class="seek">
             <input type="range" class="seekbar" data-role="seek" min="0" max="1" step="1" value="0" aria-label="Position in bars" disabled />
             <ol class="sections" data-role="sections" aria-label="Parts of the track"></ol>
