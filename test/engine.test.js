@@ -80,6 +80,19 @@ test('play evaluates the code, stop hushes it', async () => {
   assert.equal(engine.position(), null);
 });
 
+test('tells the visuals when a track runs, plays and stops', async () => {
+  const events = [];
+  const visuals = { beforeRun: () => events.push('run'), afterRun: () => events.push('play'), stop: () => events.push('stop') };
+  const engine = createEngine({ load: async () => fakeStrudel(), visuals });
+  await engine.play('s("bd")');
+  assert.deepEqual(events, ['run', 'play']);
+  engine.stop();
+  assert.deepEqual(events, ['run', 'play', 'stop']);
+  const failing = createEngine({ load: async () => fakeStrudel({ failEval: new Error('typo') }), visuals });
+  await assert.rejects(failing.play('s("bd"'), /typo/);
+  assert.deepEqual(events.slice(3), ['run', 'stop'], 'code that fails shows no visuals');
+});
+
 test('errors Strudel reports during evaluation are thrown', async () => {
   const engine = createEngine({ load: async () => fakeStrudel({ failEval: new Error('note is not defined') }) });
   await assert.rejects(engine.play('nope()'), /note is not defined/);

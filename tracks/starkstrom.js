@@ -196,6 +196,29 @@ const preload = stack(
   s("realclaps:1 breaks165"),
 ).gain(0)
 
+// ---------- VISUALS (Hydra) ----------
+// Laufen im Player hinter dem Code und genauso auf strudel.cc.
+// H() macht aus einem Pattern eine Zahl, die Hydra in jedem Bild liest:
+// `energy` folgt den Teilen des Arrangements unten, `pulse` dem Beat.
+await initHydra()
+const energy = H(arrange(
+  [16, saw.range(0, .3).slow(16)],   // intro: wird langsam heller
+  [8,  saw.range(.3, .8).slow(8)],   // build
+  [32, "1"],                         // drop 1
+  [8,  ".25"],                       // breakdown
+  [8,  saw.range(.3, .9).slow(8)],   // build 2
+  [32, "1"],                         // drop 2
+  [16, isaw.range(0, .6).slow(16)],  // outro: blendet aus
+))
+const pulse = H(isaw.fast(4))
+// Starkstrom: Lichtbögen, die über das Bild zucken und nachglühen
+const arc = () => .4 + pulse() * energy() * .6
+shape(2, .006, .004).modulate(noise(6, .8), () => .1 + energy() * .2)
+  .add(shape(2, .004, .004).rotate(1.2).modulate(noise(9, 1), .15))
+  .color(() => arc() * .6, () => arc() * .9, arc)
+  .add(src(o0), .8)
+  .out()
+
 // ---------- ARRANGEMENT ----------
 const intro = stack(
   preload.mask("<1 0!15>"),

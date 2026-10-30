@@ -1,6 +1,7 @@
 // Browser entry point.
 import { createApp } from './app.js';
 import { createEngine } from './engine.js';
+import { createVisuals } from './visuals.js';
 
 function safeStorage() {
   try {
@@ -13,9 +14,17 @@ function safeStorage() {
   }
 }
 
+// Tracks call initHydra() and H() as on strudel.cc, so both are globals.
+let engine = null;
+const visuals = createVisuals({ canvas: document.querySelector('[data-role=visuals]'), now: () => engine.position() });
+window.initHydra = visuals.initHydra;
+window.H = visuals.H;
+engine = createEngine({ visuals });
+
 const app = await createApp({
   root: document.querySelector('[data-role=app]'),
-  engine: createEngine(),
+  engine,
+  visuals,
   fetchFn: (url) => fetch(url),
   storage: safeStorage(),
   location: window.location,

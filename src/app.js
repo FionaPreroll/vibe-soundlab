@@ -29,7 +29,7 @@ export function describeTrack(meta) {
   return [meta.style, meta.key, meta.bpm && `${meta.bpm} BPM`, length].filter(Boolean).join(' · ');
 }
 
-export async function createApp({ root, engine, fetchFn, storage = null, location = null }) {
+export async function createApp({ root, engine, fetchFn, storage = null, location = null, visuals = null }) {
   const doc = root.ownerDocument;
   const library = new Library({ storage });
   const REPEAT_KEY = 'vibe-player:repeat';
@@ -39,7 +39,15 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   } catch {
     // Blocked storage: start with repeat off.
   }
+  const VISUALS_KEY = 'vibe-player:visuals';
+  let storedVisuals = null;
+  try {
+    storedVisuals = storage?.getItem(VISUALS_KEY) ?? null;
+  } catch {
+    // Blocked storage: visuals on.
+  }
   const state = {
+    visuals: storedVisuals !== 'off',
     selected: null,
     playing: null,
     loading: null,
@@ -63,6 +71,7 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
   const dropZone = q('[data-role=drop]');
   const progress = q('[data-role=progress]');
   const repeatButton = q('[data-role=repeat]');
+  const visualsButton = q('[data-role=visuals-toggle]');
   const seekBar = q('[data-role=seek]');
   const sectionList = q('[data-role=sections]');
   const sectionName = q('[data-role=section]');
@@ -289,6 +298,23 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     return added;
   }
 
+  function renderVisuals() {
+    visualsButton.hidden = visuals === null;
+    visualsButton.textContent = state.visuals ? 'Visuals on' : 'Visuals off';
+    visualsButton.setAttribute('aria-pressed', String(state.visuals));
+    visuals?.setEnabled(state.visuals);
+  }
+
+  function toggleVisuals() {
+    state.visuals = !state.visuals;
+    try {
+      storage?.setItem(VISUALS_KEY, state.visuals ? 'on' : 'off');
+    } catch {
+      // Not remembered, but still switched for this visit.
+    }
+    renderVisuals();
+  }
+
   function cycleRepeat() {
     state.repeat = nextRepeatMode(state.repeat);
     try {
@@ -322,6 +348,8 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
 
   playButton.addEventListener('click', () => toggle());
   repeatButton.addEventListener('click', () => cycleRepeat());
+  visualsButton.addEventListener('click', () => toggleVisuals());
+  renderVisuals();
   // Dragging only previews the target; letting go (or a key press) jumps there.
   seekBar.addEventListener('input', () => {
     state.scrub = Number(seekBar.value);
@@ -377,5 +405,5 @@ export async function createApp({ root, engine, fetchFn, storage = null, locatio
     markPlaying(now);
   }
 
-  return { engine, library, state, mixer, select, play, stop, toggle, seekTo, addFiles, removeUpload, updateProgress, cycleRepeat, drawFrame };
+  return { engine, library, state, mixer, select, play, stop, toggle, seekTo, addFiles, removeUpload, updateProgress, cycleRepeat, toggleVisuals, drawFrame };
 }

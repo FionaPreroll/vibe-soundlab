@@ -68,6 +68,14 @@ a { color: var(--accent); }
 }
 
 .top { grid-area: top; }
+.visuals-toggle { float: right; margin: 4px 0 0 12px; }
+.visuals-toggle[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+
+/* Hydra visuals fill the window behind the player while a track with visuals plays. */
+.visuals { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; opacity: 0; transition: opacity .8s; }
+.visuals.on { opacity: .9; }
+body:has(.visuals.on) :is(.now, .card, .track, .drop) { background: color-mix(in srgb, var(--panel) 80%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+body:has(.visuals.on) .top { text-shadow: 0 1px 10px var(--bg); }
 .top h1 { margin: 0; font-size: 1.6rem; letter-spacing: .01em; }
 .top h1 span { color: var(--muted); font-weight: 400; }
 .top p { margin: 4px 0 0; color: var(--muted); }

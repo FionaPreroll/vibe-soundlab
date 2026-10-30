@@ -23,6 +23,22 @@ mini-notation atoms (notes, sounds, numbers in `"..."` strings) that are soundin
 strudel.cc editor does. Strudel records where in the code each atom of a pattern was written;
 the player asks the playing pattern which notes are sounding and marks those places.
 
+Every track also brings its own [Hydra](https://hydra.ojack.xyz/) visuals, drawn full screen
+behind the player (the "Visuals" button in the top corner turns them off). Tracks start them the
+way they would on strudel.cc, so the same code runs in both places:
+
+```js
+await initHydra()
+const energy = H(arrange([16, saw.range(0, .3).slow(16)], [32, "1"], ...))
+osc(18, .03, .4).brightness(() => -.5 + energy() * .2).out()
+```
+
+`H(pattern)` turns a Strudel pattern into a number Hydra reads every frame, at the bar the music
+is at. The tracks use one `energy` pattern that follows their own arrangement (low in the intro,
+rising in the builds, 1 in the drops) and one `pulse` on the beat. The player loads Hydra from
+jsDelivr (`hydra-synth`, pinned in `src/visuals.js`) the first time a track asks for it; if it
+can't, the track plays without visuals.
+
 The live player: https://fionapreroll.github.io/vibe-soundlab/
 
 > The sound design lessons (the foghorn lesson app) live on the
@@ -88,6 +104,9 @@ entry keeps the default name:
 // @mixer Drums, Bass, Arpeggio, Drums 2, Echo, Lead
 ```
 
+Visuals go in a block before the arrangement: `await initHydra()`, then Hydra code that ends in
+`.out()`. The final `arrange(...)` must stay the last expression, because that is what plays.
+
 After adding or renaming a track, run `pnpm run tracks` to update `tracks/index.json`.
 
 ### Chiptunes
@@ -118,7 +137,8 @@ pnpm install
 pnpm start        # serves the folder at http://localhost:8000
 ```
 
-Strudel itself loads from the jsDelivr CDN (`@strudel/web`, pinned in `src/engine.js`).
+Strudel itself loads from the jsDelivr CDN (`@strudel/web`, pinned in `src/engine.js`), and so
+does Hydra (`hydra-synth`, pinned in `src/visuals.js`).
 Uploaded tracks are kept in the browser's local storage.
 
 ## Tests
@@ -141,7 +161,9 @@ every event of the whole arrangement. For every track:
   "duck target orbit does not exist");
 - distortion types and vowels are ones Strudel knows;
 - only breaks that are exactly one bar long get stretched onto a bar with `fit()`;
-- every sound and sample number exists, every bar plays something, levels stay sane.
+- every sound and sample number exists, every bar plays something, levels stay sane;
+- the Hydra visuals use only functions Hydra has (`test/support/hydra.js` checks them against
+  the pinned `hydra-synth`), and one `H()` pattern is 1 exactly in the drops.
 
 For the drum & bass tracks:
 
@@ -172,6 +194,6 @@ For the chiptunes (`test/support/tracker.js`, tried on small examples in `test/t
 | --- | --- |
 | `tracks/` | the Strudel tracks and `index.json` |
 | `index.html`, `css/` | the player page |
-| `src/` | player code: engine (Strudel, seeking), library (repo tracks and uploads), playlist and repeat rules, track parts for the progress bar, mixer (settings, audio graph, EQ math, meters, panel), code highlighting, upload checks, header parsing, strudel.cc links |
+| `src/` | player code: engine (Strudel, seeking), library (repo tracks and uploads), playlist and repeat rules, track parts for the progress bar, mixer (settings, audio graph, EQ math, meters, panel), code highlighting, Hydra visuals, upload checks, header parsing, strudel.cc links |
 | `scripts/` | `index-tracks.js` (track index), `snapshot-samples.js` (sample names for the tests) |
 | `test/` | tests; `test/support/` runs Strudel in Node and holds the harmony and tracker checks |

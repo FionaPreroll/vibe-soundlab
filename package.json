@@ -18,6 +18,7 @@
     "@strudel/tonal": "1.2.6",
     "@strudel/transpiler": "1.2.6",
     "@strudel/web": "1.2.6",
+    "hydra-synth": "1.4.0",
     "jsdom": "^25.0.1",
     "playwright": "1.63.0",
     "superdough": "1.2.6"

@@ -18,6 +18,7 @@ import {
   overLayerClashes,
   padVoicings,
 } from './support/harmony.js';
+import { parseSections, sectionAt } from '../src/sections.js';
 import { toMidi } from './support/strudel.js';
 import {
   CHANNEL,
@@ -139,6 +140,27 @@ for (const file of files) {
     test('only ducks orbits that already play', async () => {
       const { haps } = await analyseTrack(file);
       assert.deepEqual(earlyDucks(haps), []);
+    });
+
+    test('has Hydra visuals that light up in the drops', async () => {
+      const { code, meta, visuals } = await analyseTrack(file);
+      assert.equal(visuals.inits, 1, 'calls initHydra() once');
+      assert.ok(visuals.outputs.length > 0, 'sends a picture to an output with .out()');
+      assert.ok(visuals.patterns.length > 0, 'reads the music with H()');
+      const sections = parseSections(code);
+      const valueAt = (pattern, t) => Number(pattern.queryArc(t, t)[0]?.value ?? 0);
+      const times = Array.from({ length: meta.bars * 4 }, (_, i) => i / 4 + 1 / 8);
+      for (const pattern of visuals.patterns) {
+        for (const t of times) {
+          const value = valueAt(pattern, t);
+          assert.ok(Number.isFinite(value) && value >= 0 && value <= 1, `H() gives ${value} at bar ${t}`);
+        }
+      }
+      const inDrop = (t) => sectionAt(sections, t)?.name.startsWith('drop') ?? false;
+      assert.ok(
+        visuals.patterns.some((p) => times.every((t) => (valueAt(p, t) === 1) === inDrop(t))),
+        'one H() pattern is 1 in the drops and lower everywhere else',
+      );
     });
 
     test('layers that share an orbit agree on its reverb and delay', async () => {

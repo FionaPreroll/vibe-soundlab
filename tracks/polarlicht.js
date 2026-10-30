@@ -128,6 +128,30 @@ const preload = stack(
   n(run(32)).s("amencutup"), s("bd:2 sd:6 rd:1 cr:1").bank("RolandTR909"),
 ).gain(0)
 
+// ---------- VISUALS (Hydra) ----------
+// Laufen im Player hinter dem Code und genauso auf strudel.cc.
+// H() macht aus einem Pattern eine Zahl, die Hydra in jedem Bild liest:
+// `energy` folgt den Teilen des Arrangements unten, `pulse` dem Beat.
+await initHydra()
+const energy = H(arrange(
+  [16, saw.range(0, .3).slow(16)],   // intro: wird langsam heller
+  [8,  saw.range(.3, .8).slow(8)],   // build
+  [32, "1"],                         // drop 1
+  [16, ".25"],                       // breakdown
+  [8,  saw.range(.3, .9).slow(8)],   // build 2
+  [32, "1"],                         // drop 2
+  [16, isaw.range(0, .6).slow(16)],  // outro: blendet aus
+))
+const pulse = H(isaw.fast(2).early(.25))
+// Polarlicht: grüne Vorhänge, die über den Himmel wehen
+osc(40, .02, 0)
+  .modulate(noise(1.5, .05), .3)
+  .mult(shape(2, .45, .5).modulate(noise(.8, .05), .5))
+  .color(.3, 1, .6)
+  .add(noise(1, .02).color(.5, 0, .8), .15)
+  .brightness(() => -.25 + energy() * .1 + pulse() * energy() * .08)
+  .out()
+
 // ---------- ARRANGEMENT ----------
 const intro = stack(
   preload.mask("<1 0!15>"),

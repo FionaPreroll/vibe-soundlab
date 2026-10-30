@@ -192,6 +192,28 @@ const preload = stack(
   s("bd:3 sd:13 cp:1 hh oh:1 rd:2 cr:3").bank("RolandTR909"), s("breaks165"),
 ).gain(0)
 
+// ---------- VISUALS (Hydra) ----------
+// Laufen im Player hinter dem Code und genauso auf strudel.cc.
+// H() macht aus einem Pattern eine Zahl, die Hydra in jedem Bild liest:
+// `energy` folgt den Teilen des Arrangements unten, `pulse` dem Beat.
+await initHydra()
+const energy = H(arrange(
+  [16, saw.range(0, .3).slow(16)],   // intro: wird langsam heller
+  [8,  saw.range(.3, .8).slow(8)],   // build
+  [32, "1"],                         // drop 1
+  [16, ".25"],                       // breakdown
+  [8,  saw.range(.3, .9).slow(8)],   // build 2
+  [32, "1"],                         // drop 2
+  [16, isaw.range(0, .6).slow(16)],  // outro: blendet aus
+))
+const pulse = H(isaw.fast(2).early(.25))  // Schlag auf der Snare (2 und 4)
+// Druckwelle: jede Snare schickt eine Welle aus Ringen nach außen
+const wave = () => (1 - pulse()) * energy()
+osc(50, -.3, 0).kaleid(99)
+  .color(.85, .38, .12)
+  .mult(shape(99, () => .05 + wave() * .9, .3))
+  .out()
+
 // ---------- ARRANGEMENT ----------
 // DJ-Intro: der Beat läuft früh, das Horn kommt gefiltert dazu
 const intro = stack(

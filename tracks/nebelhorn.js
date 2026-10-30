@@ -116,6 +116,28 @@ const preload = stack(
   s("bd:3 sd:9 rim hh oh cr:3").bank("RolandTR909"), s("perc").bank("RolandTR808"), s("breaks165"),
 ).gain(0)
 
+// ---------- VISUALS (Hydra) ----------
+// Laufen im Player hinter dem Code und genauso auf strudel.cc.
+// H() macht aus einem Pattern eine Zahl, die Hydra in jedem Bild liest:
+// `energy` folgt den Teilen des Arrangements unten, `pulse` dem Beat.
+await initHydra()
+const energy = H(arrange(
+  [16, saw.range(0, .3).slow(16)],   // intro: wird langsam heller
+  [8,  saw.range(.3, .8).slow(8)],   // build
+  [32, "1"],                         // drop 1
+  [8,  ".25"],                       // breakdown
+  [8,  saw.range(.3, .9).slow(8)],   // build 2
+  [32, "1"],                         // drop 2
+  [8,  isaw.range(0, .6).slow(8)],   // outro: blendet aus
+))
+const pulse = H(isaw.fast(2).early(.25))  // Schlag auf der Snare (2 und 4)
+// Nebelhorn: Nebel über dem Wasser, ein Leuchtturm streicht hindurch
+noise(1.2, .04).modulate(noise(2, .03), .12)
+  .color(.45, .55, .65).brightness(-.3)
+  .add(shape(2, .03, .4).rotate(0, .12).color(1, .9, .6).mult(noise(1.5, .1).brightness(.2)), () => .15 + energy() * .35)
+  .brightness(() => pulse() * energy() * .1)
+  .out()
+
 // ---------- ARRANGEMENT ----------
 const intro = stack(
   preload.mask("<1 0!15>"),
