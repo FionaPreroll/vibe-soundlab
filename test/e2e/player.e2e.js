@@ -75,6 +75,15 @@ page.on('console', (msg) => {
   if (!expectErrors && (msg.type() === 'error' || /\[eval\] error|error:/i.test(text))) problems.push(`${step}: console: ${text}`);
 });
 
+// Hydra's clock (window.time, as Hydra runs with makeGlobal) moves on while the visuals
+// draw; once it is NaN they stay black, though the canvas is still shown.
+const hydraClockRuns = () =>
+  page.evaluate(async () => {
+    const before = window.time;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return Number.isFinite(window.time) && window.time > before;
+  });
+
 try {
   await page.goto(url);
   await page.waitForSelector('.track .pick');
@@ -101,6 +110,7 @@ try {
     if (state !== 'running') problems.push(`${titles[i]}: audio context is ${state}`);
     const visuals = await page.$eval('[data-role=visuals]', (canvas) => canvas.classList.contains('on'));
     if (!visuals) problems.push(`${titles[i]}: the Hydra visuals did not start`);
+    else if (!(await hydraClockRuns())) problems.push(`${titles[i]}: the Hydra visuals are shown but stand still`);
     const bar = Number(progress.match(/Bar (\d+)/)?.[1]);
     const expected = Math.ceil((SECONDS_PER_TRACK * Number(status.match(/(\d+) BPM/)?.[1] ?? 174)) / 240) + 2;
     if (!(bar >= 1 && bar <= expected)) problems.push(`${titles[i]}: expected to start from bar 1, now at ${progress}`);
@@ -214,6 +224,7 @@ try {
   if (!/^Playing .* \(updated\)$/.test(good)) problems.push(`live edits, a good change: ${good}`);
   if (!(after >= before)) problems.push(`live edits: the track started again (bar ${before} → ${after})`);
   if (!(await page.isVisible('[data-role=edited]'))) problems.push('live edits: the changed track is not marked as edited');
+  if (!(await hydraClockRuns())) problems.push('live edits: the Hydra visuals stand still after the changes');
   await page.click('[data-role=revert]');
   await page.waitForFunction(() => !document.querySelector('[data-role=edited]').checkVisibility(), null, { timeout: 5000 }).catch(() => problems.push('live edits: undo kept the change'));
 

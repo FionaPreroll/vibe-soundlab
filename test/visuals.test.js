@@ -233,12 +233,60 @@ test('code changed while a track plays keeps the visuals until the new code repl
   assert.equal(visuals.isShowing(), false);
 });
 
+test('the visuals hold still while a track’s code runs, so Strudel’s speed() can’t stop Hydra’s clock', async () => {
+  const visuals = createVisuals({ canvas, load });
+  await playTrackWithVisuals(visuals);
+  const [hydra] = FakeHydra.made;
+  runFrame(1000);
+  // the next track, or a change to this one: Strudel's globals are back on window meanwhile
+  for (const fresh of [true, false]) {
+    visuals.beforeRun({ fresh });
+    runFrame(1020);
+    assert.deepEqual(hydra.ticks, [16], 'no frame while the code runs');
+    assert.equal(frames.size, 1, 'but the loop goes on');
+    await visuals.initHydra();
+    visuals.afterRun();
+    runFrame(1040);
+    assert.deepEqual(hydra.ticks, [16, 20]);
+    hydra.ticks = [16];
+  }
+  // and when it is stopped while its code runs
+  visuals.beforeRun();
+  visuals.stop();
+  await playTrackWithVisuals(visuals);
+  runFrame(2000);
+  assert.equal(hydra.ticks.length, 2);
+});
+
 test('changed code that fails leaves the visuals as they were', async () => {
   const visuals = createVisuals({ canvas, load });
   await playTrackWithVisuals(visuals);
   visuals.beforeRun({ fresh: false });
   visuals.failedRun();
   assert.equal(visuals.isShowing(), true);
+});
+
+test('changed code that fails gives the visuals that carry on Hydra’s functions back', async () => {
+  class GlobalHydra extends FakeHydra {
+    constructor(options) {
+      super(options);
+      this.synth = { speed: 1 };
+      Object.assign(options.canvas.ownerDocument.defaultView, this.synth);
+    }
+  }
+  const visuals = createVisuals({ canvas, load: async () => GlobalHydra });
+  await playTrackWithVisuals(visuals);
+  visuals.beforeRun({ fresh: false });
+  win.speed = 'Strudel speed';
+  visuals.failedRun();
+  assert.equal(win.speed, 1);
+  // code without visuals that fails leaves Strudel's in place
+  visuals.beforeRun({ fresh: false });
+  visuals.afterRun();
+  visuals.beforeRun({ fresh: false });
+  win.speed = 'Strudel speed';
+  visuals.failedRun();
+  assert.equal(win.speed, 'Strudel speed');
 });
 
 test('visuals that throw while drawing stop, and the error is reported once', async () => {

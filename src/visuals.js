@@ -55,6 +55,7 @@ export function createVisuals({ canvas, now = () => null, load = loadHydra, scal
   let broken = false; // the visuals threw while drawing
   let brokenBefore = false;
   let running = false; // the current track is playing
+  let busy = false; // a track's code is running
   let enabled = true;
   let frame = null;
   let last = 0;
@@ -104,6 +105,11 @@ export function createVisuals({ canvas, now = () => null, load = loadHydra, scal
     frame = win.requestAnimationFrame(tick);
     const dt = last ? Math.min(100, time - last) : 16;
     last = time;
+    // Hydra reads speed, bpm, fps and update from window every frame. While a track's
+    // code runs, Strudel's own speed() is back there, and a single frame then makes
+    // Hydra's clock NaN: the visuals stayed black for every track after it. They hold
+    // still until the code has run.
+    if (busy) return;
     try {
       hydra.tick(dt);
     } catch (err) {
@@ -146,21 +152,26 @@ export function createVisuals({ canvas, now = () => null, load = loadHydra, scal
       brokenBefore = broken;
       used = false;
       broken = false;
+      busy = true;
       if (fresh) hydra?.hush();
     },
     /** After a track's code ran and it plays. */
     afterRun() {
+      busy = false;
       if (!used) hydra?.hush();
       running = true;
       update();
     },
-    /** The changed code failed: the visuals that ran before it carry on. */
+    /** The changed code failed: the visuals that ran before it carry on, with Hydra's functions. */
     failedRun() {
+      busy = false;
       used = usedBefore;
       broken = brokenBefore;
+      if (used) Object.assign(win, globals);
       update();
     },
     stop() {
+      busy = false;
       running = false;
       update();
     },

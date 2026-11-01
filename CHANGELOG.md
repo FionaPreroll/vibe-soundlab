@@ -29,6 +29,7 @@ All notable changes to the player and its tracks. The format follows
 
 ### Fixed
 
+- The visuals no longer turn black for good after you switch to another track while one plays, let the playlist move on to the next one, or change the code while it plays. Every track's visuals now show, not only the first one's.
 - Notes on orbits the mixer has no channel for (like 0.5 or 12) are no longer dropped; they play on the first channel.
 - A song that replaces one of Strudel's own functions no longer breaks the songs you play after it.
 - Songs that use `all()` work again after a track with visuals has played.
