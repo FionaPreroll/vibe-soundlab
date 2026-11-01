@@ -11,6 +11,7 @@
     "e2e": "node test/e2e/player.e2e.js",
     "tracks": "node scripts/index-tracks.js",
     "sources": "node scripts/index-sources.js",
+    "screenshots": "node scripts/screenshots.js",
     "samples": "node scripts/snapshot-samples.js"
   },
   "devDependencies": {

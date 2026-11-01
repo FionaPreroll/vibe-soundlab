@@ -1,0 +1,104 @@
+# Takes the README's screenshots again (pnpm run screenshots) and opens a pull
+# request with the new ones, to look at and approve before they go in.
+# Run it by hand: Actions → Update screenshots → Run workflow.
+# On pull requests that change how the screenshots are taken, it only checks that
+# they can still be taken, and keeps them as an artifact of the run.
+name: Update screenshots
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - scripts/screenshots.js
+      - test/e2e/site.js
+      - .github/workflows/screenshots.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  take:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      # Without this, Chromium on Linux shows the player in DejaVu Sans. Inter is close
+      # to the system fonts of macOS and Windows that most listeners see.
+      - name: Use Inter as the system font
+        run: |
+          sudo apt-get install -y --no-install-recommends fonts-inter
+          sudo tee /etc/fonts/conf.d/56-prefer-inter.conf > /dev/null <<'EOF'
+          <?xml version="1.0"?>
+          <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+          <fontconfig>
+            <alias><family>system-ui</family><prefer><family>Inter</family></prefer></alias>
+            <alias><family>-apple-system</family><prefer><family>Inter</family></prefer></alias>
+            <alias><family>Segoe UI</family><prefer><family>Inter</family></prefer></alias>
+            <alias><family>sans-serif</family><prefer><family>Inter</family></prefer></alias>
+          </fontconfig>
+          EOF
+          fc-cache -f
+          fc-match system-ui
+      - run: pnpm run screenshots
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: docs/screenshots/
+          if-no-files-found: error
+
+  # Only when run by hand on main: the new screenshots go into a pull request.
+  # A pull request a workflow opens can be approved by the person who reviews it.
+  propose:
+    needs: take
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      BRANCH: feature/update_screenshots
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: screenshots
+          path: docs/screenshots/
+      - name: Open or update the pull request
+        run: |
+          if [ -z "$(git status --porcelain -- docs/screenshots)" ]; then
+            echo "The screenshots did not change."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$BRANCH"
+          git add docs/screenshots
+          git commit -q -m "Update the README screenshots"
+          git push -q --force origin "$BRANCH"
+          if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then
+            echo "Updated the open pull request from $BRANCH."
+            exit 0
+          fi
+          cat > body.md <<EOF
+          New screenshots for the README, taken by the [Update screenshots run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) from ${GITHUB_SHA::7}.
+
+          Under **Files changed**, GitHub shows each old and new picture side by side (2-up, swipe or onion skin). Approve and merge to put them in the README, or close this pull request to keep the old ones. Running the workflow again while this is open replaces its pictures.
+
+          CI does not run here: GitHub starts no workflows for pull requests that a workflow opened, and only pictures changed.
+          EOF
+          if ! gh pr create --base main --head "$BRANCH" --title "Update the README screenshots" --body-file body.md --assignee "$GITHUB_ACTOR" --reviewer "$GITHUB_ACTOR"; then
+            echo "::error::Could not open the pull request. If GitHub says Actions may not create pull requests, turn on Settings → Actions → General → Workflow permissions → \"Allow GitHub Actions to create and approve pull requests\" and run the workflow again."
+            exit 1
+          fi

@@ -6,11 +6,16 @@ Drum & bass and chiptunes written in [Strudel](https://strudel.cc/), and a brows
 four atmospheric tracks, three bangers, three Reese rollers and three keygen-style chiptunes.
 Pick one of the tracks in this repo, upload your own Strudel file and play it next to them, or switch
 on the songs other people share on GitHub (see [Songs from GitHub](#songs-from-github)).
+
+![The player in the first drop of Druckwelle: the track list, the progress bar with the parts of the track, the guitar chords and the mixer, with the track's visuals behind them](docs/screenshots/player.png)
+
 Play runs through the list: when a track reaches its last bar (`@bars`), the next one starts.
 The repeat button switches between off (stop after the last track), all (start over) and one
 (repeat the current track). Uploads without a `@bars` header loop until you pick another track.
 The progress bar shows the parts of the track (intro, build, drops, …) as the final `arrange(...)`
 lists them; click or drag it, or click a part, to jump there.
+
+<img src="docs/screenshots/now-playing.png" width="728" alt="Druckwelle playing in its first drop: the progress bar, with the parts Intro, Build, Drop 1, Breakdown, Build 2, Drop 2 and Outro underneath">
 
 The mixer has one channel per orbit (see the table below) and a master, each with a fader, mute,
 solo and a live spectrum with a level meter. The 8-band EQ (shelves at 40 Hz and 14 kHz, bells at
@@ -19,10 +24,14 @@ over that channel's live spectrum. Mixer and EQ settings stay in the browser.
 To get there, the player tells Strudel to give every orbit its own pair of output channels
 (multi-channel orbits) and splits them back up in its own Web Audio graph (`src/mixer-graph.js`).
 
+<img src="docs/screenshots/mixer.png" width="728" alt="The mixer with a live spectrum and level meter on every channel, and the EQ on the bass channel: its curve, with 4 dB more at 100 Hz, 5 dB less at 250 Hz and 3 dB more at 3.5 kHz, drawn over the bass's spectrum">
+
 The code panel shows the track with syntax colours and, while it plays, outlines the
 mini-notation atoms (notes, sounds, numbers in `"..."` strings) that are sounding, the way the
 strudel.cc editor does. Strudel records where in the code each atom of a pattern was written;
 the player asks the playing pattern which notes are sounding and marks those places.
+
+<img src="docs/screenshots/code.png" width="728" alt="The code of Druckwelle with syntax colours; the notes that sound right now are outlined">
 
 The code can be changed while it plays: type in the code panel, then press Update or Ctrl+Enter
 (⌘+Enter) and the new code takes over without starting the track again, as on strudel.cc;
@@ -47,6 +56,8 @@ Mistakes in the code can't take the page down (`src/guard.js`):
 - Code still running after 30 seconds is given up on, so one song can't block the next.
 - Hydra errors while drawing stop the visuals instead of repeating every frame.
 
+<img src="docs/screenshots/live-edit.png" width="728" alt="A mistake typed into Druckwelle while it plays, an open bracket in s(&quot;bd [sd&quot;): the line is marked red and the message under the code says the string ends before the bracket is closed">
+
 The guitar chords are worked out from the pattern that plays (`src/chords.js`): every half bar,
 a few bars ahead of the music, the player asks the pattern for its notes (drums, noise and silent
 notes don't count), weighs them by how long they sound (a held pad says more than a run of
@@ -57,6 +68,8 @@ covers the notes is kept, so names don't flicker. Roots are spelled from the `@k
 shape for every chord type in every key: the open chords first, else a movable shape with its root on
 the low E, A or D string, as low on the neck as fits; the tests check that every shape sounds its
 chord with the root at the bottom.
+
+<img src="docs/screenshots/chords.png" width="728" alt="The guitar chords during Druckwelle: the chord now and the next ones, each with its fingering; root notes are yellow">
 
 Every track also brings its own [Hydra](https://hydra.ojack.xyz/) visuals, drawn full screen
 behind the player (the "Visuals" button in the top corner turns them off). Tracks start them the
@@ -73,6 +86,12 @@ is at. The tracks use one `energy` pattern that follows their own arrangement (l
 rising in the builds, 1 in the drops or choruses) and one `pulse` on the beat. The player loads
 Hydra from jsDelivr (`hydra-synth`, pinned in `src/visuals.js`) the first time a track asks for
 it; if it can't, the track plays without visuals.
+
+| Nachtschicht | Polarlicht | Kernschmelze |
+| :---: | :---: | :---: |
+| ![Night-blue streaks folded into a kaleidoscope](docs/screenshots/visuals-nachtschicht.png) | ![Green northern lights](docs/screenshots/visuals-polarlicht.png) | ![Melting red and orange cells](docs/screenshots/visuals-kernschmelze.png) |
+| **Schwerkraft** | **Seriennummer** | **Rasterzeile** |
+| ![A purple black hole](docs/screenshots/visuals-schwerkraft.png) | ![A pixel plasma in rainbow colours](docs/screenshots/visuals-seriennummer.png) | ![C64 raster bars](docs/screenshots/visuals-rasterzeile.png) |
 
 The live player: https://fionapreroll.github.io/vibe-soundlab/
 
@@ -175,6 +194,8 @@ The player can also list Strudel songs from other people's GitHub repositories:
 Playing one of these songs runs its code in the page, so they stay hidden until the listener
 switches them on ("Show their songs"); the choice is kept in the browser and can be undone. Before
 that, the player asks GitHub for nothing, not even the list.
+
+<img src="docs/screenshots/songs-from-github.png" width="344" alt="Songs from GitHub, switched on: a search field, eefano's songs folded and tzwaan's songs open, with titles and credits">
 
 `src/sources.js` says where each repository keeps its songs (`folders`) and reads what the player
 shows from the comments at the top of each file, since none of them uses this repo's header:
@@ -282,13 +303,37 @@ For the chiptunes (`test/support/tracker.js`, tried on small examples in `test/t
 `test/reference.test.js` runs the same checks on the first version of Nachtschicht
 (`test/fixtures/nachtschicht-v1.js`) and confirms they catch what was wrong with it.
 
+## Screenshots
+
+The pictures in this README are in `docs/screenshots/`, and `pnpm run screenshots` takes them again
+(`scripts/screenshots.js`). Like `pnpm run e2e`, it plays the tracks in headless Chromium, here
+Druckwelle from its first drop and six more for their visuals, and photographs the parts of the player.
+
+To update them on GitHub, run the **Update screenshots** workflow on `main` (Actions → Update
+screenshots → Run workflow, `.github/workflows/screenshots.yml`). It takes new screenshots on a GitHub
+runner and opens a pull request with them from the branch `feature/update_screenshots`, assigned to
+whoever started the workflow, with a review requested from them. Under Files changed GitHub shows each
+old and new picture side by side. Merge it to put the new pictures in the README, or close it to keep
+the old ones; running the workflow again while it is open replaces its pictures.
+
+- The workflow opens the pull request with the repository's own `GITHUB_TOKEN`. GitHub only allows that
+  once "Allow GitHub Actions to create and approve pull requests" is turned on (Settings → Actions →
+  General → Workflow permissions). Because a workflow opened the pull request, you can approve it
+  yourself, and CI does not run on it; only pictures change.
+- The runner shows the player in Inter, which the workflow installs as the system font. Without it,
+  Chromium on Linux would use DejaVu Sans; Inter is close to what macOS and Windows show.
+- A pull request that changes how the screenshots are taken (`scripts/screenshots.js`,
+  `test/e2e/site.js` or the workflow) runs the workflow too, without opening a pull request: it checks
+  that the screenshots can still be taken and keeps them as an artifact of the run.
+
 ## Layout
 
 | Path | What it holds |
 | --- | --- |
 | `tracks/` | the Strudel tracks and `index.json` |
 | `sources/` | `index.json`, the songs from other GitHub repositories (written by `pnpm run sources`) |
+| `docs/screenshots/` | the pictures in this README (written by `pnpm run screenshots`) |
 | `index.html`, `css/` | the player page |
 | `src/` | player code: engine (Strudel, seeking, changes while playing), guards against mistakes in the code, library (repo tracks, uploads, songs from GitHub), playlist and repeat rules, track parts for the progress bar, mixer (settings, audio graph, EQ math, meters, panel), code highlighting and editor, guitar chords and shapes, Hydra visuals, upload checks, header parsing, strudel.cc links and extras, samples from other sites, the GitHub sources |
-| `scripts/` | `index-tracks.js` (track index), `index-sources.js` (songs from GitHub), `snapshot-samples.js` (sample names for the tests) |
-| `test/` | tests; `test/support/` runs Strudel in Node and holds the harmony and tracker checks |
+| `scripts/` | `index-tracks.js` (track index), `index-sources.js` (songs from GitHub), `snapshot-samples.js` (sample names for the tests), `screenshots.js` (the pictures in this README) |
+| `test/` | tests; `test/support/` runs Strudel in Node and holds the harmony and tracker checks; `test/e2e/` plays the player in Chromium (`site.js` serves it for the browser test and the screenshots) |
