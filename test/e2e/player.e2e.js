@@ -2,51 +2,21 @@
 // repo track for a few seconds and a made-up song in place of one from GitHub,
 // and fails on any error Strudel or the page reports.
 // Needs Playwright with Chromium and network access: pnpm run e2e
-import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
-import { extname, join, normalize } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
-import { SOUNDFONTS_URL, STRUDEL_URL } from '../../src/engine.js';
+import { STRUDEL_URL } from '../../src/engine.js';
 import { codeUrl } from '../../src/sources.js';
-import { HYDRA_URL } from '../../src/visuals.js';
+import { ROOT, contextOptions, launchBrowser, routeLibraries, serveSite } from './site.js';
 
-const require = createRequire(import.meta.url);
-const { chromium } = require('playwright');
-const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 const SECONDS_PER_TRACK = Number(process.env.E2E_SECONDS ?? 6);
 
-const server = createServer(async (req, res) => {
-  const path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^(\.\.[/\\])+/, '');
-  try {
-    const body = await readFile(join(ROOT, path.endsWith('/') ? `${path}index.html` : path));
-    res.writeHead(200, { 'content-type': TYPES[extname(path)] ?? 'text/html' }).end(body);
-  } catch {
-    res.writeHead(404).end('not found');
-  }
-});
-await new Promise((r) => server.listen(0, r));
-const url = `http://localhost:${server.address().port}/`;
-
-const proxy = process.env.HTTPS_PROXY ? { server: process.env.HTTPS_PROXY, bypass: 'localhost' } : undefined;
-const browser = await chromium.launch({ proxy, args: ['--autoplay-policy=no-user-gesture-required'] });
-const page = await browser.newPage({ ignoreHTTPSErrors: !!proxy });
-// Serve @strudel/web from node_modules (same pinned version as the CDN URL), so the
-// test also runs where the CDN is blocked.
-const strudelDir = require.resolve('@strudel/web/dist/index.mjs').replace(/dist[/\\]index\.mjs$/, '');
-const cdnBase = STRUDEL_URL.replace(/dist\/index\.mjs$/, '');
-await page.route(`${cdnBase}**`, async (route) => {
-  const file = join(strudelDir, route.request().url().slice(cdnBase.length).split('?')[0]);
-  route.fulfill({ body: await readFile(file), contentType: 'text/javascript' });
-});
-// Hydra the same way: its browser build from node_modules.
-const hydraFile = require.resolve('hydra-synth');
-await page.route(HYDRA_URL, async (route) => route.fulfill({ body: await readFile(hydraFile), contentType: 'text/javascript' }));
-// And the General MIDI soundfonts module.
-const fontsFile = require.resolve('@strudel/soundfonts/dist/index.mjs');
-await page.route(SOUNDFONTS_URL, async (route) => route.fulfill({ body: await readFile(fontsFile), contentType: 'text/javascript' }));
+const server = await serveSite();
+const { url } = server;
+const browser = await launchBrowser();
+const page = await browser.newPage(contextOptions());
+// Strudel, Hydra and the General MIDI soundfonts module come from node_modules.
+await routeLibraries(page);
 // Songs from GitHub: every one is served as this made-up song, which uses what
 // strudel.cc has on top of Strudel (short bank names, sliders, piano(), o(), drawings).
 const SONG = `// "Made-up song" (for the browser test)
